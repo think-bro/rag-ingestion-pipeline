@@ -1,14 +1,16 @@
 from litestar import Litestar
 from litestar.plugins.structlog import StructlogPlugin
 
-from app.controllers.greeting import GreetingController
+from app.features.document_parsing.controller import ParserController
+
 
 def create_app() -> Litestar:
     """Application factory function."""
     return Litestar(
-        route_handlers=[GreetingController],
+        route_handlers=[ParserController],
         plugins=[StructlogPlugin()],
         debug=True,
     )
+
 
 app = create_app()
