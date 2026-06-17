@@ -4,4 +4,13 @@ version = "0.1.0"
 description = "A document ingestion pipeline for RAG workflows."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "litestar[standard]>=2.24.0",
+    "structlog>=26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.17",
+    "ty>=0.0.49",
+]
