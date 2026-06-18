@@ -93,12 +93,17 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 - The Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
 - Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume and permission setup.
 
-## Git Conventions
+## Git Conventions & Release Automation
 
 - Commit messages follow **[Conventional Commits](https://www.conventionalcommits.org/)**: `<type>(<scope>): <description>`
 - Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
 - Scope matches the feature or area: `backend`, `frontend`, `root`, `document_parsing`, `core`
 - Example: `feat(document_parsing): Add PDF parsing support`
+
+This repository uses **Google Release Please** for automated semantic versioning based on commits.
+- **Do NOT** manually bump versions in `pyproject.toml` files or `uv.lock`.
+- Merging to `master` will trigger the `release-please` bot to automatically open a Release PR updating the versions and changelogs.
+- A secondary workflow will automatically sync `uv.lock` within that Release PR.
 
 ## Guardrails
 

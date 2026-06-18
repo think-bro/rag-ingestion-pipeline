@@ -82,3 +82,10 @@ To maintain code quality and a clean history, we use a branch-and-pull-request w
 4. **Pull Request:** Push your branch and open a Pull Request against `master`. 
    - We encourage opening "Draft" PRs early to get feedback during development.
    - All code must be reviewed and merged via PRs. Never push directly to `master`.
+
+### Automated Versioning & Releases
+
+We use **[Google Release Please](https://github.com/googleapis/release-please)** to fully automate semantic versioning for our monorepo. It analyzes your Conventional Commits merged to `master` and automatically opens a "Release PR" to bump versions (`pyproject.toml`), generate `CHANGELOG.md` files, and sync `uv.lock`. 
+
+- **Do not manually edit version numbers** in your PRs. 
+- The version increment is calculated automatically: `fix:` triggers a patch bump, `feat:` triggers a minor bump, and `BREAKING CHANGE:` triggers a major bump.
