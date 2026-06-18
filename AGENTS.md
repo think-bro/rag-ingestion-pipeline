@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), parses them via Docling, and converts to structured markdown. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
+Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), parses them via Docling, and converts to structured Markdown or JSON. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
 
 ## Tech Stack
 
-- Python 3.14, Docling, structlog
+- Python 3.14, Docling, Pydantic, structlog
 - Backend: Litestar
 - Frontend: Streamlit
 - Containerization: Docker, Docker Compose
@@ -75,8 +75,8 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 
 ### Adding a new feature (Backend)
 
-1. Create `apps/backend/app/features/<feature_name>/` with `__init__.py`, `controller.py`, `service.py`.
-2. The controller handles HTTP concerns. The service handles business logic. Keep them separated.
+1. Create `apps/backend/app/features/<feature_name>/` with `__init__.py`, `controller.py`, `service.py`, `schemas.py`.
+2. The controller handles HTTP concerns. The service handles business logic. Schemas define request/response models using Pydantic. Keep them separated.
 3. Register the controller in `apps/backend/app/main.py` under `route_handlers`.
 
 ### Rules
@@ -85,6 +85,21 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 - Shared infrastructure (config, DB connections, middleware) belongs in `apps/backend/app/core/`.
 - Never place business logic in controllers — delegate to the service layer.
 - Never create top-level directories like `controllers/`, `models/`, or `services/`. That is layer-based architecture.
+- Use Pydantic `BaseModel` for all request/response schemas. Define them in `schemas.py` within each feature module.
+
+### Async Task Pattern
+
+For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern:
+
+1. `POST` endpoint accepts the request, creates a task entry, and returns HTTP 202 with a `task_id`.
+2. The actual processing is scheduled via Litestar's `BackgroundTask`, which runs after the response is sent.
+3. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `asyncio.to_thread()` to avoid blocking the event loop.
+4. A `GET /tasks/{task_id}` endpoint allows polling for task status and results.
+5. Task state is stored in-memory (future: Redis or similar persistent store).
+
+### Singleton Services
+
+Heavy resources like `DocumentConverter` (which loads ML models) are initialized once in `app_lifespan` and stored on `app.state`. Services that depend on these resources are also created once and injected via Litestar's DI system (`Provide`).
 
 ## Docker
 

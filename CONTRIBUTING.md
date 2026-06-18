@@ -38,7 +38,7 @@ This project is a **monorepo** containing a Litestar `backend` and a Streamlit `
 
 The backend strictly follows a **Feature-Based Architecture**.
 
-- **`apps/backend/app/features/`**: All domain-specific logic goes here. Each feature (like `document_parsing`) must be a self-contained module with its own `controller.py`, `service.py`, models, and schemas.
+- **`apps/backend/app/features/`**: All domain-specific logic goes here. Each feature (like `document_parsing`) must be a self-contained module with its own `controller.py`, `service.py`, and `schemas.py` (Pydantic models for request/response types).
 - **`apps/backend/app/core/`**: Shared infrastructure like database setup, configuration, and logging configuration goes here.
 
 **Do not** create layer-based directories at the top level (e.g., `apps/backend/app/controllers` or `apps/backend/app/services`).
