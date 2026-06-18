@@ -4,9 +4,11 @@ Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), 
 
 ## Tech Stack
 
-- Python 3.14, Litestar, Docling, structlog
+- Python 3.14, Docling, structlog
+- Backend: Litestar
+- Frontend: Streamlit
 - Containerization: Docker, Docker Compose
-- Package manager: `uv` (never use `pip` or `poetry`)
+- Monorepo package manager: `uv` workspaces (never use `pip` or `poetry`)
 - Linting & formatting: `ruff`
 - Type checking: `ty`
 - Task runner: `just`
@@ -14,15 +16,21 @@ Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), 
 ## Project Structure
 
 ```
-app/
-├── main.py                          # Litestar application factory
-├── core/                            # Cross-cutting: config, logging, DB setup
-└── features/                        # Feature-based modules
-    └── document_parsing/            # Existing feature
-        ├── controller.py            # Route handlers (Litestar Controller)
-        └── service.py               # Business logic (Docling integration)
+apps/
+├── backend/                         # Litestar application
+│   ├── app/                         # Backend code
+│   │   ├── main.py
+│   │   ├── core/
+│   │   └── features/
+│   ├── pyproject.toml
+│   └── Dockerfile
+└── frontend/                        # Streamlit application
+    ├── main.py
+    ├── pyproject.toml
+    └── Dockerfile
 
-Dockerfile                           # Multi-stage build (builder + runtime)
+pyproject.toml                       # Workspace root config
+uv.lock                              # Unified workspace lockfile
 compose.yaml                         # Dev environment with hot-reload and model caching
 justfile                             # Task runner commands
 ```
@@ -38,7 +46,8 @@ justfile                             # Task runner commands
 ### Local (Without Docker)
 
 - Install dependencies: `just install` or `uv sync`
-- Dev server: `just dev-local` or `uv run litestar --app app.main:app run --debug --reload`
+- Dev server (backend): `just dev-backend` or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`
+- Dev server (frontend): `just dev-frontend` or `uv run --package frontend streamlit run apps/frontend/main.py`
 
 ### Code quality (always local)
 
@@ -51,48 +60,49 @@ Always run `just check` before finalizing any work.
 
 ## Code Style
 
-- Use `structlog` for all logging. Never use stdlib `logging`.
+- Use `structlog` for all logging in backend. Never use stdlib `logging`.
 - All functions must have full type annotations — signatures, return types, variables where non-obvious.
 - Use `structlog.get_logger()` at module level, not inside functions.
 - Prefer `async` handlers in controllers.
 - Use relative imports within a feature module (e.g., `from .service import ParserService`).
-- Use absolute imports for cross-feature or core references (e.g., `from app.core.config import settings`).
+- Use absolute imports for cross-feature or core references (e.g., `from apps.backend.app.core.config import settings`).
 - All comments, docstrings, and commit messages must be in English.
 
 ## Architecture
 
-This project uses **feature-based architecture**. Each feature is a self-contained vertical slice.
+This project uses a **monorepo architecture** managed by `uv` workspaces.
+The backend uses **feature-based architecture**. Each feature is a self-contained vertical slice.
 
-### Adding a new feature
+### Adding a new feature (Backend)
 
-1. Create `app/features/<feature_name>/` with `__init__.py`, `controller.py`, `service.py`.
+1. Create `apps/backend/app/features/<feature_name>/` with `__init__.py`, `controller.py`, `service.py`.
 2. The controller handles HTTP concerns. The service handles business logic. Keep them separated.
-3. Register the controller in `app/main.py` under `route_handlers`.
+3. Register the controller in `apps/backend/app/main.py` under `route_handlers`.
 
 ### Rules
 
-- All domain logic belongs in `app/features/<feature_name>/`.
-- Shared infrastructure (config, DB connections, middleware) belongs in `app/core/`.
+- All domain logic belongs in `apps/backend/app/features/<feature_name>/`.
+- Shared infrastructure (config, DB connections, middleware) belongs in `apps/backend/app/core/`.
 - Never place business logic in controllers — delegate to the service layer.
 - Never create top-level directories like `controllers/`, `models/`, or `services/`. That is layer-based architecture.
 
 ## Docker
 
-- The app runs inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
+- The apps run inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
 - ML model weights are persisted in named Docker volumes (`hf-models-cache`, `rapidocr-models-cache`) to avoid re-downloading on container restarts.
 - The Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
-- Do not modify `Dockerfile` or `compose.yaml` without understanding the volume and permission setup.
+- Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume and permission setup.
 
 ## Git Conventions
 
 - Commit messages follow **[Conventional Commits](https://www.conventionalcommits.org/)**: `<type>(<scope>): <description>`
 - Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
-- Scope matches the feature or area: `app`, `root`, `document_parsing`, `core`
+- Scope matches the feature or area: `backend`, `frontend`, `root`, `document_parsing`, `core`
 - Example: `feat(document_parsing): Add PDF parsing support`
 
 ## Guardrails
 
 - Never modify `uv.lock` manually. Run `uv sync` or `uv add <package>` instead.
 - Never commit `.venv/`, `__pycache__/`, or build artifacts.
-- Never add dependencies without adding them to `pyproject.toml` via `uv add`.
+- Never add dependencies without adding them to the respective `pyproject.toml` via `uv add --package <package_name> <dependency>`.
 - Do not create test files yet — testing infrastructure has not been set up.

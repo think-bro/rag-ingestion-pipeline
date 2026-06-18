@@ -14,9 +14,13 @@ build:
 
 # --- LOCAL DEVELOPMENT (BACKUP AND CODE QUALITY) ---
 
-# Fallback: Run locally without Docker
-dev-local:
-	uv run litestar --app app.main:app run --debug --reload
+# Fallback: Run backend locally without Docker
+dev-backend:
+	uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
+
+# Fallback: Run frontend locally without Docker
+dev-frontend:
+	uv run --package frontend streamlit run apps/frontend/main.py
 
 # Update local venv so IDEs (VS Code, etc.) can resolve dependencies
 install:

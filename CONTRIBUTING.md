@@ -27,18 +27,21 @@ If you prefer to skip Docker entirely:
 
 1. **Install tools:** Ensure you have Python 3.14+, `uv`, and optionally `just` installed.
 2. **Install dependencies:** `just install` (or `uv sync`).
-3. **Start the server:** `just dev-local` (or `uv run litestar --app app.main:app run --debug --reload`).
+3. **Start the backend server:** `just dev-backend` (or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`).
+4. **Start the frontend server:** `just dev-frontend` (or `uv run --package frontend streamlit run apps/frontend/main.py`).
 
 Note that local development requires your system to have all native dependencies (e.g. OpenCV libraries) that Docker provides out of the box.
 
 ## Project Architecture
 
-We strictly follow a **Feature-Based Architecture**.
+This project is a **monorepo** containing a Litestar `backend` and a Streamlit `frontend` under the `apps/` directory.
 
-- **`app/features/`**: All domain-specific logic goes here. Each feature (like `document_parsing`) must be a self-contained module with its own `controller.py`, `service.py`, models, and schemas.
-- **`app/core/`**: Shared infrastructure like database setup, configuration, and logging configuration goes here.
+The backend strictly follows a **Feature-Based Architecture**.
 
-**Do not** create layer-based directories at the top level (e.g., `app/controllers` or `app/services`).
+- **`apps/backend/app/features/`**: All domain-specific logic goes here. Each feature (like `document_parsing`) must be a self-contained module with its own `controller.py`, `service.py`, models, and schemas.
+- **`apps/backend/app/core/`**: Shared infrastructure like database setup, configuration, and logging configuration goes here.
+
+**Do not** create layer-based directories at the top level (e.g., `apps/backend/app/controllers` or `apps/backend/app/services`).
 
 ## Code Style & Standards
 
@@ -58,7 +61,8 @@ We strictly follow a **Feature-Based Architecture**.
 | Start dev environment | `just dev` | `docker compose up --build` |
 | Stop dev environment | `just down` | `docker compose down` |
 | Build image only | `just build` | `docker compose build` |
-| Start without Docker | `just dev-local` | `uv run litestar --app app.main:app run --debug --reload` |
+| Start backend locally | `just dev-backend` | `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload` |
+| Start frontend locally | `just dev-frontend` | `uv run --package frontend streamlit run apps/frontend/main.py` |
 | Install dependencies | `just install` | `uv sync` |
 | Lint | `just lint` | `uv run ruff check .` |
 | Format | `just format` | `uv run ruff format .` |
@@ -71,7 +75,7 @@ We follow **[Conventional Commits](https://www.conventionalcommits.org/)** for o
 `<type>(<scope>): <description>`
 
 **Types:** `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
-**Scopes:** Match the feature or area (e.g., `app`, `core`, `document_parsing`)
+**Scopes:** Match the feature or area (e.g., `backend`, `frontend`, `root`, `document_parsing`)
 
 *Example:* `feat(document_parsing): Add PDF parsing support`
 

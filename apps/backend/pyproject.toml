@@ -1,0 +1,12 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Litestar backend for RAG ingestion pipeline."
+requires-python = ">=3.14"
+dependencies = [
+    "docling>=2.103.0",
+    "litestar[standard]>=2.24.0",
+    "structlog>=26.1.0",
+    "torch",
+    "torchvision",
+]

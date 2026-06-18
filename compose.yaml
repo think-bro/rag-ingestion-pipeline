@@ -1,19 +1,20 @@
 services:
-  app:
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: apps/backend/Dockerfile
     ports:
       - "8000:8000"
     environment:
       - DOCLING_DEVICE=cpu
-      - HF_HOME=/app/models/hf
-    command: litestar --app app.main:app run --host 0.0.0.0 --port 8000 --debug --reload
+      - HF_HOME=/workspace/models/hf
+    command: litestar --app apps.backend.app.main:app run --host 0.0.0.0 --port 8000 --debug --reload
     volumes:
-      - .:/app
-      - /app/.venv
-      - hf-models-cache:/app/models/hf
-      - rapidocr-models-cache:/app/.venv/lib/python3.14/site-packages/rapidocr/models
+      - .:/workspace
+      - /workspace/.venv
+      - hf-models-cache:/workspace/models/hf
+      - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
+    working_dir: /workspace
     restart: unless-stopped
     healthcheck:
       test:
@@ -27,6 +28,21 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    ports:
+      - "8501:8501"
+    command: streamlit run apps/frontend/main.py --server.port=8501 --server.address=0.0.0.0
+    volumes:
+      - .:/workspace
+      - /workspace/.venv
+    working_dir: /workspace
+    restart: unless-stopped
+    depends_on:
+      - backend
 
 volumes:
   hf-models-cache:

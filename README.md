@@ -3,7 +3,7 @@
 A document ingestion pipeline for RAG (Retrieval-Augmented Generation) workflows. 
 
 ## Overview
-This project processes raw documents (like PDFs, DOCX, etc.) and prepares them for vector search. 
+This project processes raw documents (like PDFs, DOCX, etc.) and prepares them for vector search. It is structured as a `uv` workspace monorepo containing a Litestar backend and a Streamlit frontend.
 
 **Pipeline Stages:**
 1. **Parsing (Current Stage):** Extracts structured markdown from documents using Docling.
@@ -13,10 +13,11 @@ This project processes raw documents (like PDFs, DOCX, etc.) and prepares them f
 
 ## Tech Stack
 - **Backend Framework:** [Litestar](https://github.com/litestar-org/litestar)
+- **Frontend Framework:** [Streamlit](https://github.com/streamlit/streamlit)
 - **Document Parsing:** [Docling](https://github.com/docling-project/docling)
 - **Logging:** [structlog](https://github.com/hynek/structlog)
 - **Containerization:** [Docker](https://www.docker.com/)
-- **Package Management:** [uv](https://github.com/astral-sh/uv)
+- **Package & Monorepo Management:** [uv workspaces](https://github.com/astral-sh/uv)
 - **Task Runner:** [just](https://github.com/casey/just)
 - **Quality & Typing:** [ruff](https://github.com/astral-sh/ruff) and [ty](https://github.com/astral-sh/ty)
 
@@ -43,7 +44,8 @@ just dev
 docker compose up --build
 ```
 
-The API will be available at `http://localhost:8000`. You can test the parsing endpoint at `POST /documents/parse` by uploading a file via multipart form-data.
+The Backend API will be available at `http://localhost:8000`.
+The Frontend UI will be available at `http://localhost:8501`.
 
 To shut down:
 ```bash
@@ -55,14 +57,21 @@ just down          # or: docker compose down
 If you prefer to run without Docker (e.g. for faster iteration on code-only changes):
 
 ```bash
-uv sync                                                          # install dependencies
-uv run litestar --app app.main:app run --debug --reload          # start dev server
+# install dependencies
+uv sync
+
+# start backend server
+uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
+
+# start frontend server
+uv run --package frontend streamlit run apps/frontend/main.py
 ```
 
 Or with `just`:
 ```bash
 just install       # uv sync
-just dev-local     # start dev server without Docker
+just dev-backend   # start backend server without Docker
+just dev-frontend  # start frontend server without Docker
 ```
 
 ### Code Quality
@@ -70,7 +79,7 @@ just dev-local     # start dev server without Docker
 Linting, formatting, and type checking run locally regardless of how you run the app:
 
 ```bash
-just check         # runs lint + format + typecheck sequentially
+just check         # runs lint + format + typecheck sequentially across the workspace
 ```
 
 Or individually:

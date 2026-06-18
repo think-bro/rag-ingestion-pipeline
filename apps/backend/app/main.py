@@ -1,7 +1,7 @@
 from litestar import Litestar, get
 from litestar.plugins.structlog import StructlogPlugin
 
-from app.features.document_parsing.controller import ParserController
+from apps.backend.app.features.document_parsing.controller import ParserController
 
 
 @get("/health")

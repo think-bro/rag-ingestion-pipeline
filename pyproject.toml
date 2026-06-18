@@ -1,16 +1,5 @@
-[project]
-name = "rag-ingestion-pipeline"
-version = "0.1.0"
-description = "A document ingestion pipeline for RAG workflows."
-readme = "README.md"
-requires-python = ">=3.14"
-dependencies = [
-    "docling>=2.103.0",
-    "litestar[standard]>=2.24.0",
-    "structlog>=26.1.0",
-    "torch",
-    "torchvision",
-]
+[tool.uv.workspace]
+members = ["apps/*"]
 
 [dependency-groups]
 dev = [
