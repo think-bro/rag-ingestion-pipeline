@@ -6,7 +6,7 @@ A document ingestion pipeline for RAG (Retrieval-Augmented Generation) workflows
 This project processes raw documents (like PDFs, DOCX, etc.) and prepares them for vector search. It is structured as a `uv` workspace monorepo containing a Litestar backend and a Streamlit frontend.
 
 **Pipeline Stages:**
-1. **Parsing (Current Stage):** Extracts structured markdown from documents using Docling.
+1. **Parsing (Current Stage):** Extracts structured content from documents using Docling. Supports Markdown and JSON output formats.
 2. **Chunking (Planned):** Splitting the parsed document into semantic chunks.
 3. **Embedding (Planned):** Generating vector embeddings for each chunk.
 4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
