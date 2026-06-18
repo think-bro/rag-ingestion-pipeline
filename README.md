@@ -44,8 +44,7 @@ just dev
 docker compose up --build
 ```
 
-The Backend API will be available at `http://localhost:8000`.
-The Frontend UI will be available at `http://localhost:8501`.
+The Backend API will be available at `http://localhost:8000`. <br>The Frontend UI will be available at `http://localhost:8501`.
 
 To shut down:
 ```bash
@@ -90,4 +89,6 @@ just typecheck     # or: uv run ty check
 ```
 
 ## Contributing
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on our development workflow, architecture rules, and the process for submitting pull requests. For AI agents working on this repository, please see [AGENTS.md](AGENTS.md).
+We welcome contributions! To maintain a clean codebase, we follow a strict Pull Request workflow, please always work on a separate branch and never commit directly to `master`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full details on our branching strategy, architecture rules, and development setup. For AI agents working on this repository, please see [AGENTS.md](AGENTS.md).

@@ -69,19 +69,16 @@ The backend strictly follows a **Feature-Based Architecture**.
 | Type check | `just typecheck` | `uv run ty check` |
 | Run all checks | `just check` | run lint, format, typecheck sequentially |
 
-## Git Workflow & Commits
+## Git & Branching Workflow
 
-We follow **[Conventional Commits](https://www.conventionalcommits.org/)** for our commit messages:
-`<type>(<scope>): <description>`
+To maintain code quality and a clean history, we use a branch-and-pull-request workflow. **Direct commits to the `master` branch are not allowed.**
 
-**Types:** `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
-**Scopes:** Match the feature or area (e.g., `backend`, `frontend`, `root`, `document_parsing`)
-
-*Example:* `feat(document_parsing): Add PDF parsing support`
-
-## Pull Requests
-
-1. Create a branch from `master` (e.g., `feat/pdf-parsing` or `fix/logger-init`).
-2. Make your changes adhering to the rules above.
-3. Ensure `just check` passes.
-4. Submit a PR describing your changes.
+1. **Branch Out:** Always create a new branch from `master` for your work. Use conventional naming based on the type of your work (e.g., `feat/pdf-parsing`, `fix/logger-init`).
+2. **Commit Locally:** We follow **[Conventional Commits](https://www.conventionalcommits.org/)** for our commit messages (`<type>(<scope>): <description>`).
+   - **Types:** `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
+   - **Scopes:** Match the feature or area (e.g., `backend`, `frontend`, `root`, `document_parsing`)
+   - *Example:* `feat(document_parsing): Add PDF parsing support`
+3. **Validate:** Before pushing, ensure your code meets our standards by running `just check`.
+4. **Pull Request:** Push your branch and open a Pull Request against `master`. 
+   - We encourage opening "Draft" PRs early to get feedback during development.
+   - All code must be reviewed and merged via PRs. Never push directly to `master`.
