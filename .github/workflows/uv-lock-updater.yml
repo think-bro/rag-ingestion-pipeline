@@ -1,0 +1,43 @@
+name: Update uv.lock for Release PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-uv-lock:
+    # Only run if the PR was created by the release-please bot or github actions bot
+    if: github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'release-please[bot]' || github.event.pull_request.user.login == 'release-please-action[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Run uv lock
+        run: uv lock
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [[ -n $(git status -s uv.lock) ]]; then
+            git add uv.lock
+            git commit -m "chore: update uv.lock for new release versions"
+            git push
+          else
+            echo "No changes to uv.lock."
+          fi
