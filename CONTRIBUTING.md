@@ -4,9 +4,32 @@ Thank you for your interest in contributing to the RAG Ingestion Pipeline! This 
 
 ## Development Setup
 
-1. **Install tools:** Ensure you have `uv` and `just` installed.
-2. **Install dependencies:** Run `just install` (which uses `uv sync` under the hood).
-3. **Start the server:** Run `just dev` for local development.
+### Docker (Recommended)
+
+The primary development environment runs inside Docker. This ensures consistent behavior across machines and handles heavy dependencies (Docling, PyTorch) without polluting your host system.
+
+1. **Install Docker Desktop** and make sure it's running.
+2. **Start the dev environment:**
+   ```bash
+   just dev           # or: docker compose up --build
+   ```
+   This builds the image (if needed), mounts your local code into the container with hot-reload enabled, and starts the Litestar server at `http://localhost:8000`.
+
+3. **Install local tooling** (for IDE support and code quality checks):
+   ```bash
+   just install       # or: uv sync
+   ```
+   This creates a local `.venv` so your editor can resolve imports and run linters. You don't need this to run the app, Docker handles that, but your IDE will thank you.
+
+### Local (Without Docker)
+
+If you prefer to skip Docker entirely:
+
+1. **Install tools:** Ensure you have Python 3.14+, `uv`, and optionally `just` installed.
+2. **Install dependencies:** `just install` (or `uv sync`).
+3. **Start the server:** `just dev-local` (or `uv run litestar --app app.main:app run --debug --reload`).
+
+Note that local development requires your system to have all native dependencies (e.g. OpenCV libraries) that Docker provides out of the box.
 
 ## Project Architecture
 
@@ -27,6 +50,20 @@ We strictly follow a **Feature-Based Architecture**.
   just check
   ```
   This runs the linting, formatting, and type-checking steps sequentially.
+
+## Common Commands
+
+| Task | `just` | Manual |
+| :--- | :--- | :--- |
+| Start dev environment | `just dev` | `docker compose up --build` |
+| Stop dev environment | `just down` | `docker compose down` |
+| Build image only | `just build` | `docker compose build` |
+| Start without Docker | `just dev-local` | `uv run litestar --app app.main:app run --debug --reload` |
+| Install dependencies | `just install` | `uv sync` |
+| Lint | `just lint` | `uv run ruff check .` |
+| Format | `just format` | `uv run ruff format .` |
+| Type check | `just typecheck` | `uv run ty check` |
+| Run all checks | `just check` | run lint, format, typecheck sequentially |
 
 ## Git Workflow & Commits
 

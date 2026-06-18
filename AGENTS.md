@@ -5,6 +5,7 @@ Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), 
 ## Tech Stack
 
 - Python 3.14, Litestar, Docling, structlog
+- Containerization: Docker, Docker Compose
 - Package manager: `uv` (never use `pip` or `poetry`)
 - Linting & formatting: `ruff`
 - Type checking: `ty`
@@ -20,15 +21,30 @@ app/
     └── document_parsing/            # Existing feature
         ├── controller.py            # Route handlers (Litestar Controller)
         └── service.py               # Business logic (Docling integration)
+
+Dockerfile                           # Multi-stage build (builder + runtime)
+compose.yaml                         # Dev environment with hot-reload and model caching
+justfile                             # Task runner commands
 ```
 
 ## Commands
 
-- Install dependencies: `uv sync`
-- Dev server: `just dev`
-- Lint: `just lint`
-- Format: `just format`
-- Type check: `just typecheck`
+### Docker (primary)
+
+- Dev server: `just dev` or `docker compose up --build`
+- Stop: `just down` or `docker compose down`
+- Build only: `just build` or `docker compose build`
+
+### Local (Without Docker)
+
+- Install dependencies: `just install` or `uv sync`
+- Dev server: `just dev-local` or `uv run litestar --app app.main:app run --debug --reload`
+
+### Code quality (always local)
+
+- Lint: `just lint` or `uv run ruff check .`
+- Format: `just format` or `uv run ruff format .`
+- Type check: `just typecheck` or `uv run ty check`
 - Run all checks: `just check`
 
 Always run `just check` before finalizing any work.
@@ -41,6 +57,7 @@ Always run `just check` before finalizing any work.
 - Prefer `async` handlers in controllers.
 - Use relative imports within a feature module (e.g., `from .service import ParserService`).
 - Use absolute imports for cross-feature or core references (e.g., `from app.core.config import settings`).
+- All comments, docstrings, and commit messages must be in English.
 
 ## Architecture
 
@@ -58,6 +75,13 @@ This project uses **feature-based architecture**. Each feature is a self-contain
 - Shared infrastructure (config, DB connections, middleware) belongs in `app/core/`.
 - Never place business logic in controllers — delegate to the service layer.
 - Never create top-level directories like `controllers/`, `models/`, or `services/`. That is layer-based architecture.
+
+## Docker
+
+- The app runs inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
+- ML model weights are persisted in named Docker volumes (`hf-models-cache`, `rapidocr-models-cache`) to avoid re-downloading on container restarts.
+- The Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
+- Do not modify `Dockerfile` or `compose.yaml` without understanding the volume and permission setup.
 
 ## Git Conventions
 
