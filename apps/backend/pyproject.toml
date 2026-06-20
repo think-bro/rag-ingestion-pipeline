@@ -7,6 +7,9 @@ dependencies = [
     "docling>=2.103.0",
     "litestar[standard]>=2.24.0",
     "structlog>=26.1.0",
+    "taskiq>=0.12.4",
+    "taskiq-litestar>=0.2.0",
+    "taskiq-redis>=1.2.2",
     "torch",
     "torchvision",
 ]

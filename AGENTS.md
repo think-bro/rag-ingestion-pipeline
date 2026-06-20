@@ -7,6 +7,7 @@ Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), 
 - Python 3.14, Docling, Pydantic, structlog
 - Backend: Litestar
 - Frontend: Streamlit
+- Task Queue: TaskIQ with Redis
 - Containerization: Docker, Docker Compose
 - Monorepo package manager: `uv` workspaces (never use `pip` or `poetry`)
 - Linting & formatting: `ruff`
@@ -47,6 +48,7 @@ justfile                             # Task runner commands
 
 - Install dependencies: `just install` or `uv sync`
 - Dev server (backend): `just dev-backend` or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`
+- Dev server (worker): `just dev-worker` or `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload`
 - Dev server (frontend): `just dev-frontend` or `uv run --package frontend streamlit run apps/frontend/main.py`
 
 ### Code quality (always local)
@@ -89,13 +91,18 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 
 ### Async Task Pattern
 
-For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern:
+For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
-1. `POST` endpoint accepts the request, creates a task entry, and returns HTTP 202 with a `task_id`.
-2. The actual processing is scheduled via Litestar's `BackgroundTask`, which runs after the response is sent.
-3. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `asyncio.to_thread()` to avoid blocking the event loop.
-4. A `GET /tasks/{task_id}` endpoint allows polling for task status and results.
-5. Task state is stored in-memory (future: Redis or similar persistent store).
+1. `POST` endpoint accepts the request, kicks off a TaskIQ background task (`parse_document_task.kiq()`), and returns HTTP 202 with a `task_id`.
+2. The actual processing is executed by a separate `worker` process via TaskIQ. This prevents blocking the main web server process.
+3. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `asyncio.to_thread()` within the worker task to avoid blocking the worker's event loop.
+4. A `GET /tasks/{task_id}` endpoint allows polling for task status and results by querying the Redis backend using TaskIQ's API.
+5. Task state and results are stored in Redis (`RedisAsyncResultBackend`), ensuring results persist across application restarts. Results are set to expire after a certain time (e.g. 1 hour).
+6. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
+
+**Important Files:**
+- `apps/backend/app/core/broker.py`: Centralized definition for the TaskIQ broker and result backend.
+- `apps/backend/app/features/document_parsing/tasks.py`: Contains the actual TaskIQ tasks (`@broker.task()`).
 
 ### Singleton Services
 

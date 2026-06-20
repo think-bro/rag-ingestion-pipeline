@@ -1,4 +1,21 @@
 services:
+  redis:
+    image: rag-ingestion-pipeline-redis
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: .
@@ -16,6 +33,9 @@ services:
       - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
     working_dir: /workspace
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -28,6 +48,25 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment:
+      - DOCLING_DEVICE=cpu
+      - HF_HOME=/workspace/models/hf
+    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks
+    volumes:
+      - .:/workspace
+      - /workspace/.venv
+      - hf-models-cache:/workspace/models/hf
+      - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
+    working_dir: /workspace
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -47,3 +86,4 @@ services:
 volumes:
   hf-models-cache:
   rapidocr-models-cache:
+  redis-data:

@@ -14,6 +14,7 @@ This project processes raw documents (like PDFs, DOCX, etc.) and prepares them f
 ## Tech Stack
 - **Backend Framework:** [Litestar](https://github.com/litestar-org/litestar)
 - **Frontend Framework:** [Streamlit](https://github.com/streamlit/streamlit)
+- **Task Queue:** [TaskIQ](https://github.com/taskiq-python/taskiq) with [Redis](https://github.com/redis/redis/)
 - **Document Parsing:** [Docling](https://github.com/docling-project/docling)
 - **Logging:** [structlog](https://github.com/hynek/structlog)
 - **Containerization:** [Docker](https://www.docker.com/)
@@ -62,6 +63,9 @@ uv sync
 # start backend server
 uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
 
+# start worker process
+uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
+
 # start frontend server
 uv run --package frontend streamlit run apps/frontend/main.py
 ```
@@ -70,6 +74,7 @@ Or with `just`:
 ```bash
 just install       # uv sync
 just dev-backend   # start backend server without Docker
+just dev-worker    # start background worker without Docker
 just dev-frontend  # start frontend server without Docker
 ```
 
