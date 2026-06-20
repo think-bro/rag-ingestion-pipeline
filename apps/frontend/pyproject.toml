@@ -1,9 +1,0 @@
-[project]
-name = "frontend"
-version = "0.3.0"
-description = "Streamlit frontend for RAG ingestion pipeline."
-requires-python = ">=3.14"
-dependencies = [
-    "requests>=2.34.2",
-    "streamlit",
-]
