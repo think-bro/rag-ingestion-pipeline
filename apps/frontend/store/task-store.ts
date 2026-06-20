@@ -11,12 +11,15 @@ interface TaskState {
   createDummyTask: () => void;
   handleCancelTask: (id: string) => void;
   handleDeleteTask: (id: string) => void;
+  isNewIngestionModalOpen: boolean;
   setActiveTaskId: (id: string | null) => void;
+  setNewIngestionModalOpen: (open: boolean) => void;
   tasks: Task[];
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   activeTaskId: null,
+  isNewIngestionModalOpen: false,
   tasks: [],
 
   createDummyTask: () => {
@@ -59,6 +62,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   setActiveTaskId: (id) => set({ activeTaskId: id }),
+  setNewIngestionModalOpen: (open) => set({ isNewIngestionModalOpen: open }),
 }));
 
 export function useTasks() {

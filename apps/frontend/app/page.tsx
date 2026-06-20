@@ -5,7 +5,7 @@ import { CallToActionCard } from "@/components/cta-card";
 import { useTasks } from "@/store/task-store";
 
 export default function Page() {
-  const { createDummyTask } = useTasks();
+  const { setNewIngestionModalOpen } = useTasks();
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center p-6">
@@ -17,7 +17,7 @@ export default function Page() {
               Start your ingestion jobs
             </>
           ),
-          onClick: () => createDummyTask(),
+          onClick: () => setNewIngestionModalOpen(true),
         }}
         description="Upload a PDF to parse, chunk, and embed it into your vector store."
         icons={[FileText, Upload, DatabaseSearch]}

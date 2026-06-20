@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { NewIngestionModal } from "@/components/new-ingestion-modal";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -48,5 +49,10 @@ function LayoutContent({ children }: { children: ReactNode }) {
 }
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  return <LayoutContent>{children}</LayoutContent>;
+  return (
+    <>
+      <LayoutContent>{children}</LayoutContent>
+      <NewIngestionModal />
+    </>
+  );
 }

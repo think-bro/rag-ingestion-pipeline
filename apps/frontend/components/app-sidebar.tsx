@@ -18,7 +18,8 @@ import { useTasks } from "@/store/task-store";
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { isMobile } = useSidebar();
-  const { tasks, activeTaskId, setActiveTaskId, createDummyTask } = useTasks();
+  const { tasks, activeTaskId, setActiveTaskId, setNewIngestionModalOpen } =
+    useTasks();
 
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
@@ -50,7 +51,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 className="h-10 w-full cursor-pointer gap-2 bg-primary font-medium text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                onClick={createDummyTask}
+                onClick={() => setNewIngestionModalOpen(true)}
                 tooltip="New Ingestion"
               >
                 <PlusIcon className="size-4" />
