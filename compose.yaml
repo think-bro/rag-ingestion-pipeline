@@ -70,15 +70,10 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
+      context: apps/frontend
+      dockerfile: Dockerfile
     ports:
-      - "8501:8501"
-    command: streamlit run apps/frontend/main.py --server.port=8501 --server.address=0.0.0.0
-    volumes:
-      - .:/workspace
-      - /workspace/.venv
-    working_dir: /workspace
+      - "3000:8080"
     restart: unless-stopped
     depends_on:
       - backend

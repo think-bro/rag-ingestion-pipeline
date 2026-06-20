@@ -24,7 +24,7 @@ dev-worker:
 
 # Fallback: Run frontend locally without Docker
 dev-frontend:
-	uv run --package frontend streamlit run apps/frontend/main.py
+	cd apps/frontend && pnpm dev
 
 # Update local venv so IDEs (VS Code, etc.) can resolve dependencies
 install:
