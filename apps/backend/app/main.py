@@ -8,6 +8,7 @@ from litestar.datastructures import State
 from litestar.di import Provide
 from litestar.plugins.structlog import StructlogPlugin
 
+from apps.backend.app.core.broker import broker
 from apps.backend.app.features.document_parsing.controller import ParserController
 from apps.backend.app.features.document_parsing.service import ParserService
 
@@ -21,14 +22,18 @@ async def health_check() -> dict[str, str]:
 @asynccontextmanager
 async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     """Manages the lifecycle of global resources."""
-    # Initialize DocumentConverter once at startup.
-    # This prevents loading ML models on every request.
+    if not broker.is_worker_process:
+        await broker.startup()
+
     app.state.converter = DocumentConverter()
     app.state.parser_service = ParserService(converter=app.state.converter)
     yield
-    # Cleanup resources if necessary
+
     del app.state.converter
     del app.state.parser_service
+
+    if not broker.is_worker_process:
+        await broker.shutdown()
 
 
 def provide_parser_service(state: State) -> ParserService:
@@ -38,7 +43,6 @@ def provide_parser_service(state: State) -> ParserService:
 
 def create_app() -> Litestar:
     """Application factory function."""
-
     cors_config = CORSConfig(allow_origins=["*"])
 
     return Litestar(

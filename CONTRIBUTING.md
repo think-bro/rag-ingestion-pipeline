@@ -28,7 +28,8 @@ If you prefer to skip Docker entirely:
 1. **Install tools:** Ensure you have Python 3.14+, `uv`, and optionally `just` installed.
 2. **Install dependencies:** `just install` (or `uv sync`).
 3. **Start the backend server:** `just dev-backend` (or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`).
-4. **Start the frontend server:** `just dev-frontend` (or `uv run --package frontend streamlit run apps/frontend/main.py`).
+4. **Start the worker process:** `just dev-worker` (or `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload`).
+5. **Start the frontend server:** `just dev-frontend` (or `uv run --package frontend streamlit run apps/frontend/main.py`).
 
 Note that local development requires your system to have all native dependencies (e.g. OpenCV libraries) that Docker provides out of the box.
 
@@ -62,6 +63,7 @@ The backend strictly follows a **Feature-Based Architecture**.
 | Stop dev environment | `just down` | `docker compose down` |
 | Build image only | `just build` | `docker compose build` |
 | Start backend locally | `just dev-backend` | `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload` |
+| Start worker locally | `just dev-worker` | `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload` |
 | Start frontend locally | `just dev-frontend` | `uv run --package frontend streamlit run apps/frontend/main.py` |
 | Install dependencies | `just install` | `uv sync` |
 | Lint | `just lint` | `uv run ruff check .` |

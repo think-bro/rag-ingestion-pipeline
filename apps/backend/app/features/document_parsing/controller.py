@@ -4,8 +4,6 @@ from litestar.datastructures import UploadFile
 from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotFoundException
 from litestar.params import Body
-from litestar.response import Response
-from litestar.background_tasks import BackgroundTask
 from typing import Annotated
 
 from .schemas import OutputFormat, TaskResponse, TaskResultResponse, TaskStatus
@@ -23,7 +21,7 @@ class ParserController(Controller):
         data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
         parser_service: ParserService,
         output_format: OutputFormat = OutputFormat.MARKDOWN,
-    ) -> Response[TaskResponse]:
+    ) -> TaskResponse:
         """
         Receives an uploaded file via multipart form and starts a background task
         to process it. Returns a task ID immediately.
@@ -36,26 +34,14 @@ class ParserController(Controller):
         )
         content = await data.read()
 
-        task_id, bg_task_id, bg_filename, bg_content, bg_format = (
-            parser_service.submit_parse_task(
-                filename=data.filename, content=content, output_format=output_format
-            )
+        task_id = await parser_service.submit_parse_task(
+            filename=data.filename, content=content, output_format=output_format
         )
 
-        return Response(
-            TaskResponse(
-                task_id=task_id,
-                status=TaskStatus.PENDING,
-                message="Document parsing task submitted successfully.",
-            ),
-            status_code=202,
-            background=BackgroundTask(
-                parser_service.process_document_task,
-                bg_task_id,
-                bg_filename,
-                bg_content,
-                bg_format,
-            ),
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.PENDING,
+            message="Document parsing task submitted successfully.",
         )
 
     @get(path="/tasks/{task_id:str}")
@@ -67,7 +53,7 @@ class ParserController(Controller):
         """
         Retrieves the status and result of a document parsing task.
         """
-        result = parser_service.get_task_result(task_id)
+        result = await parser_service.get_task_result(task_id)
         if not result:
             raise NotFoundException(f"Task {task_id} not found")
 

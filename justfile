@@ -18,6 +18,10 @@ build:
 dev-backend:
 	uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
 
+# Fallback: Run worker locally without Docker
+dev-worker:
+	uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
+
 # Fallback: Run frontend locally without Docker
 dev-frontend:
 	uv run --package frontend streamlit run apps/frontend/main.py
