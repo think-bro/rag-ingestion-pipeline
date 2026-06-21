@@ -41,8 +41,8 @@ WORKDIR /workspace
 # Copy only the venv from the builder stage
 COPY --from=builder --chown=appuser:appgroup /workspace/.venv /workspace/.venv
 
-RUN mkdir -p /workspace/models/hf /workspace/.venv/lib/python3.14/site-packages/rapidocr/models && \
-    chown -R appuser:appgroup /workspace/models /workspace/.venv/lib/python3.14/site-packages/rapidocr/models
+RUN mkdir -p /workspace/models/hf /workspace/.venv/lib/python3.14/site-packages/rapidocr/models /workspace/storage && \
+    chown -R appuser:appgroup /workspace/models /workspace/.venv/lib/python3.14/site-packages/rapidocr/models /workspace/storage
 
 # Copy code
 COPY --chown=appuser:appgroup . .

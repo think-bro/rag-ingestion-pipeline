@@ -41,6 +41,19 @@ class ParserService:
             output_format=output_format.value,
         )
         task_id = result.task_id
+
+        # Write initial 'pending' state to disk so it appears in the task list
+        pending_data = {
+            "task_id": task_id,
+            "status": TaskStatus.PENDING.value,
+            "filename": upload_file.filename,
+            "output_format": output_format.value,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        result_path = RESULTS_DIR / f"{task_id}.json"
+        async with await anyio.open_file(result_path, "w") as f:
+            await f.write(json.dumps(pending_data, indent=2))
+
         logger.info(
             "submitted_parse_task", task_id=task_id, filename=upload_file.filename
         )

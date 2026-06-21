@@ -31,6 +31,18 @@ async def parse_document_task(
 
     logger.info("started_parse_task", task_id=task_id, filename=filename)
 
+    # Write 'processing' state to disk immediately
+    processing_data = {
+        "task_id": task_id,
+        "status": "processing",
+        "filename": filename,
+        "output_format": output_format,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result_path = RESULTS_DIR / f"{task_id}.json"
+    async with await anyio.open_file(result_path, "w") as f:
+        await f.write(json.dumps(processing_data, indent=2))
+
     try:
         result = await asyncio.to_thread(converter.convert, file_path)
         doc = result.document

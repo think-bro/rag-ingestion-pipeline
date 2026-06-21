@@ -23,13 +23,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import type { Task } from "@/store/task-store";
+import type { TaskResultResponse } from "@/lib/api";
 
 interface TaskItemProps {
   isActive: boolean;
   isMobile: boolean;
   onSelectTask: (id: string) => void;
-  task: Task;
+  task: TaskResultResponse;
 }
 
 export function TaskItem({
@@ -41,12 +41,12 @@ export function TaskItem({
   let StatusIcon = Loader2Icon;
   let iconColor = "text-muted-foreground";
 
-  if (task.status === "queued") {
+  if (task.status === "pending") {
     StatusIcon = ClockIcon;
     iconColor = "text-amber-500";
   } else if (task.status === "processing") {
     iconColor = "text-blue-500 animate-spin";
-  } else if (task.status === "success") {
+  } else if (task.status === "completed") {
     StatusIcon = CheckCircle2Icon;
     iconColor = "text-green-500";
   } else if (task.status === "failed") {
@@ -62,14 +62,13 @@ export function TaskItem({
       <SidebarMenuButton
         className="h-10 cursor-pointer border border-transparent transition-all duration-200 data-active:border-sidebar-border data-active:shadow-xs"
         isActive={isActive}
-        onClick={() => onSelectTask(task.id)}
-        tooltip={task.name}
+        onClick={() => onSelectTask(task.task_id)}
+        tooltip={task.filename}
       >
         <StatusIcon className={`size-4 shrink-0 ${iconColor}`} />
-        <span className="truncate text-left font-medium">{task.name}</span>
+        <span className="truncate text-left font-medium">{task.filename}</span>
       </SidebarMenuButton>
 
-      {/* Dropdown Menu / 3-dot Button - direct child of SidebarMenuItem */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction

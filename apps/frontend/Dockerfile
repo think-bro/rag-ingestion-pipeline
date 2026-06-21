@@ -16,6 +16,7 @@ WORKDIR /app
 
 ENV CI=true
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=0
 
 # Copy package-related files first to leverage Docker's caching mechanism
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* pnpm-workspace.yaml* .npmrc* ./
@@ -29,7 +30,6 @@ RUN --mount=type=cache,target=/root/.npm \
   elif [ -f yarn.lock ]; then \
     corepack enable yarn && yarn install --frozen-lockfile --production=false; \
   elif [ -f pnpm-lock.yaml ]; then \
-    echo "minimumReleaseAge: 0" >> pnpm-workspace.yaml && \
     corepack enable pnpm && pnpm install --frozen-lockfile; \
   else \
     echo "No lockfile found." && exit 1; \
@@ -64,7 +64,6 @@ RUN --mount=type=cache,target=/app/.next/cache \
   elif [ -f yarn.lock ]; then \
     corepack enable yarn && yarn build; \
   elif [ -f pnpm-lock.yaml ]; then \
-    echo "minimumReleaseAge: 0" >> pnpm-workspace.yaml && \
     corepack enable pnpm && pnpm build; \
   else \
     echo "No lockfile found." && exit 1; \

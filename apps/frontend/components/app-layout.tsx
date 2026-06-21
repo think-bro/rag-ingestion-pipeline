@@ -15,10 +15,13 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { useTasks } from "@/store/task-store";
+import { useTasks } from "@/hooks/use-tasks";
+import { useTaskStore } from "@/store/task-store";
 
 function LayoutContent({ children }: { children: ReactNode }) {
-  const { activeTask } = useTasks();
+  const { activeTaskId } = useTaskStore();
+  const { data: tasks } = useTasks();
+  const activeTask = tasks?.find((t) => t.task_id === activeTaskId);
 
   return (
     <SidebarProvider>
@@ -35,7 +38,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
               <BreadcrumbList>
                 <BreadcrumbItem>
                   <BreadcrumbPage>
-                    {activeTask ? activeTask.name : "New Ingestion"}
+                    {activeTask ? activeTask.filename : "New Ingestion"}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>

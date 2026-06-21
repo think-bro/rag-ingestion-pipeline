@@ -2,10 +2,15 @@
 
 import { DatabaseSearch, FileText, Plus, Upload } from "lucide-react";
 import { CallToActionCard } from "@/components/cta-card";
-import { useTasks } from "@/store/task-store";
+import { TaskDetailView } from "@/components/task-detail-view";
+import { useTaskStore } from "@/store/task-store";
 
 export default function Page() {
-  const { setNewIngestionModalOpen } = useTasks();
+  const { activeTaskId, setNewIngestionModalOpen } = useTaskStore();
+
+  if (activeTaskId) {
+    return <TaskDetailView taskId={activeTaskId} />;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center p-6">

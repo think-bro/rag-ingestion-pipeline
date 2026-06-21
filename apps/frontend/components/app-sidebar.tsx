@@ -14,12 +14,13 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useTasks } from "@/store/task-store";
+import { useTasks } from "@/hooks/use-tasks";
+import { useTaskStore } from "@/store/task-store";
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { isMobile } = useSidebar();
-  const { tasks, activeTaskId, setActiveTaskId, setNewIngestionModalOpen } =
-    useTasks();
+  const { activeTaskId, setActiveTaskId } = useTaskStore();
+  const { data: tasks = [] } = useTasks();
 
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
@@ -51,7 +52,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 className="h-10 w-full cursor-pointer gap-2 bg-primary font-medium text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                onClick={() => setNewIngestionModalOpen(true)}
+                onClick={() => setActiveTaskId(null)}
                 tooltip="New Ingestion"
               >
                 <PlusIcon className="size-4" />
@@ -77,9 +78,9 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
               ) : (
                 tasks.map((task) => (
                   <TaskItem
-                    isActive={task.id === activeTaskId}
+                    isActive={task.task_id === activeTaskId}
                     isMobile={isMobile}
-                    key={task.id}
+                    key={task.task_id}
                     onSelectTask={setActiveTaskId}
                     task={task}
                   />

@@ -70,15 +70,15 @@ services:
       redis:
         condition: service_healthy
 
-  # frontend:
-  #   build:
-  #     context: apps/frontend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "3000:8080"
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: apps/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:8080"
+    restart: unless-stopped
+    depends_on:
+      - backend
 
 volumes:
   hf-models-cache:

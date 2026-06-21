@@ -1,5 +1,7 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+import React from "react";
 import { NewIngestionForm } from "@/components/new-ingestion-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,11 +22,15 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useTasks } from "@/store/task-store";
+import { useTaskStore } from "@/store/task-store";
 
 export function NewIngestionModal() {
-  const { isNewIngestionModalOpen, setNewIngestionModalOpen } = useTasks();
+  const { isNewIngestionModalOpen, setNewIngestionModalOpen } = useTaskStore();
   const isMobile = useIsMobile();
+  const [formState, setFormState] = React.useState({
+    hasFiles: false,
+    isPending: false,
+  });
 
   const handleClose = () => setNewIngestionModalOpen(false);
 
@@ -45,17 +51,26 @@ export function NewIngestionModal() {
           <div className="no-scrollbar overflow-y-auto p-4">
             <NewIngestionForm
               id="ingestion-form-mobile"
+              onStateChange={setFormState}
               onSuccess={handleClose}
             />
           </div>
           <DrawerFooter className="flex-col sm:flex-row-reverse sm:gap-4">
             <Button
               className="w-full sm:flex-1"
+              disabled={!formState.hasFiles || formState.isPending}
               form="ingestion-form-mobile"
               size="lg"
               type="submit"
             >
-              Start Ingestion
+              {formState.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                "Start Ingestion"
+              )}
             </Button>
             <DrawerClose asChild>
               <Button className="w-full sm:flex-1" size="lg" variant="outline">
@@ -87,6 +102,7 @@ export function NewIngestionModal() {
         <div className="no-scrollbar -mx-6 max-h-[50vh] overflow-y-auto px-6">
           <NewIngestionForm
             id="ingestion-form-desktop"
+            onStateChange={setFormState}
             onSuccess={handleClose}
           />
         </div>
@@ -101,11 +117,19 @@ export function NewIngestionModal() {
           </Button>
           <Button
             className="flex-1"
+            disabled={!formState.hasFiles || formState.isPending}
             form="ingestion-form-desktop"
             size="lg"
             type="submit"
           >
-            Start Ingestion
+            {formState.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              "Start Ingestion"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -8,30 +8,41 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
-  SelectGroup,
-  SelectLabel,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useSubmitTask } from "@/hooks/use-tasks";
 import { cn } from "@/lib/utils";
-import { useTasks } from "@/store/task-store";
+import { useTaskStore } from "@/store/task-store";
 
 export function NewIngestionForm({
   id,
   onSuccess,
+  onStateChange,
 }: {
   id?: string;
   onSuccess: () => void;
+  onStateChange?: (state: { hasFiles: boolean; isPending: boolean }) => void;
 }) {
   const [files, setFiles] = React.useState<globalThis.File[]>([]);
-  const { createDummyTask } = useTasks();
+  const { setNewIngestionModalOpen } = useTaskStore();
+  const { mutateAsync, isPending } = useSubmitTask();
+  const [format, setFormat] = React.useState("markdown");
 
-  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
-    maxSize: 100 * 1024 * 1024, // TODO: Remove or increase this limit once backend async PDF splitting is implemented
-    onDrop: (acceptedFiles) => setFiles(acceptedFiles),
-  });
+  React.useEffect(() => {
+    onStateChange?.({ hasFiles: files.length > 0, isPending });
+  }, [files.length, isPending, onStateChange]);
+
+  const { getRootProps, getInputProps, isDragActive, fileRejections } =
+    useDropzone({
+      maxSize: 100 * 1024 * 1024, // TODO: Remove or increase this limit once backend async PDF splitting is implemented
+      disabled: isPending,
+      onDrop: (acceptedFiles) => setFiles(acceptedFiles),
+    });
 
   const filesList = files.map((file) => (
     <li className="relative" key={file.name}>
@@ -39,6 +50,7 @@ export function NewIngestionForm({
         <div className="absolute top-1/2 right-4 -translate-y-1/2">
           <Button
             aria-label="Remove file"
+            disabled={isPending}
             onClick={() =>
               setFiles((prevFiles) =>
                 prevFiles.filter((prevFile) => prevFile.name !== file.name)
@@ -68,11 +80,21 @@ export function NewIngestionForm({
     </li>
   ));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate real ingestion by creating a dummy task
-    createDummyTask();
-    onSuccess();
+    if (files.length === 0) {
+      return;
+    }
+
+    try {
+      await mutateAsync({ file: files[0], format });
+      setFiles([]);
+      onSuccess();
+      setNewIngestionModalOpen(false);
+    } catch (error) {
+      console.error("Upload failed", error);
+      // TODO: Toast
+    }
   };
 
   return (
@@ -92,17 +114,17 @@ export function NewIngestionForm({
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-              <SelectLabel>Tasks</SelectLabel>
-              <SelectItem value="parsing">Parsing</SelectItem>
-              <SelectItem disabled value="chunking">
-                Chunking (not yet implemented)
-              </SelectItem>
-              <SelectItem disabled value="embedding">
-                Embedding (not yet implemented)
-              </SelectItem>
-              <SelectItem disabled value="vector">
-                Vector Storage (not yet implemented)
-              </SelectItem>
+                <SelectLabel>Tasks</SelectLabel>
+                <SelectItem value="parsing">Parsing</SelectItem>
+                <SelectItem disabled value="chunking">
+                  Chunking (not yet implemented)
+                </SelectItem>
+                <SelectItem disabled value="embedding">
+                  Embedding (not yet implemented)
+                </SelectItem>
+                <SelectItem disabled value="vector">
+                  Vector Storage (not yet implemented)
+                </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -111,19 +133,19 @@ export function NewIngestionForm({
           <Label className="font-medium" htmlFor="output-format">
             Output format
           </Label>
-          <Select defaultValue="markdown">
+          <Select disabled={isPending} onValueChange={setFormat} value={format}>
             <SelectTrigger
               className="mt-2 w-full"
               id="output-format"
               name="output-format"
             >
-              <SelectValue placeholder="Select format" />
+              <SelectValue placeholder="Select output format" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-              <SelectLabel>Formats</SelectLabel>
-              <SelectItem value="markdown">Markdown</SelectItem>
-              <SelectItem value="json">JSON</SelectItem>
+                <SelectLabel>Formats</SelectLabel>
+                <SelectItem value="markdown">Markdown</SelectItem>
+                <SelectItem value="json">JSON</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -163,11 +185,11 @@ export function NewIngestionForm({
                 </label>
                 <p className="text-pretty pl-1">to upload</p>
               </div>
-              <p className="mt-2 text-center text-xs text-muted-foreground/70">
+              <p className="mt-2 text-center text-muted-foreground/70 text-xs">
                 PDF documents up to 100MB
               </p>
               {fileRejections.length > 0 && (
-                <p className="mt-3 text-center text-sm text-destructive">
+                <p className="mt-3 text-center text-destructive text-sm">
                   File is too large. Maximum size is 100MB.
                 </p>
               )}

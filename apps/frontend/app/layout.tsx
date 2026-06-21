@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppLayout } from "@/components/app-layout";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Providers } from "@/lib/providers";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -30,11 +31,13 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body>
-        <ThemeProvider>
-          <TooltipProvider>
-            <AppLayout>{children}</AppLayout>
-          </TooltipProvider>
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider>
+            <TooltipProvider>
+              <AppLayout>{children}</AppLayout>
+            </TooltipProvider>
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );
