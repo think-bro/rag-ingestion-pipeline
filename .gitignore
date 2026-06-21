@@ -14,3 +14,7 @@ wheels/
 
 # Docker Volumes and ML Models
 models/
+storage/
+
+# Test Documents
+test-docs/

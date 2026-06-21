@@ -51,9 +51,6 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
 ENV NODE_ENV=production
-ENV CI=true
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-ENV npm_config_verify_deps_before_run=false
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry

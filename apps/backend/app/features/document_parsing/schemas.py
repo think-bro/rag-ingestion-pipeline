@@ -1,7 +1,10 @@
 import enum
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
+from litestar.dto import DTOConfig
+from litestar.contrib.pydantic import PydanticDTO
 
 
 class TaskStatus(enum.StrEnum):
@@ -9,6 +12,7 @@ class TaskStatus(enum.StrEnum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class OutputFormat(enum.StrEnum):
@@ -40,3 +44,8 @@ class TaskResultResponse(BaseModel):
     output_format: Optional[OutputFormat] = None
     content: Optional[str] = None
     error: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class TaskListDTO(PydanticDTO[TaskResultResponse]):
+    config = DTOConfig(include={"task_id", "status", "filename", "created_at"})

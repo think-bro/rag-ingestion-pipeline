@@ -6,7 +6,13 @@ from litestar.exceptions import NotFoundException
 from litestar.params import Body
 from typing import Annotated
 
-from .schemas import OutputFormat, TaskResponse, TaskResultResponse, TaskStatus
+from .schemas import (
+    OutputFormat,
+    TaskResponse,
+    TaskResultResponse,
+    TaskStatus,
+    TaskListDTO,
+)
 from .service import ParserService
 
 logger = structlog.get_logger()
@@ -32,10 +38,10 @@ class ParserController(Controller):
             content_type=data.content_type,
             output_format=output_format,
         )
-        content = await data.read()
 
-        task_id = await parser_service.submit_parse_task(
-            filename=data.filename, content=content, output_format=output_format
+        task_id = await parser_service.save_and_submit_task(
+            upload_file=data,
+            output_format=output_format,
         )
 
         return TaskResponse(
@@ -58,3 +64,13 @@ class ParserController(Controller):
             raise NotFoundException(f"Task {task_id} not found")
 
         return result
+
+    @get(path="/tasks", return_dto=TaskListDTO)
+    async def get_tasks(
+        self,
+        parser_service: ParserService,
+    ) -> list[TaskResultResponse]:
+        """
+        Retrieves a list of all document parsing tasks.
+        """
+        return await parser_service.get_all_tasks()

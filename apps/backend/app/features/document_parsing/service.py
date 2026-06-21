@@ -1,6 +1,15 @@
+import json
+import os
+import uuid
+from datetime import datetime, timezone
+
+import anyio
 import structlog
 from docling.document_converter import DocumentConverter
+from litestar.datastructures import UploadFile
 
+from apps.backend.app.core.broker import broker
+from apps.backend.app.core.config import RESULTS_DIR, UPLOAD_DIR
 from .schemas import OutputFormat, TaskResultResponse, TaskStatus
 from .tasks import parse_document_task
 
@@ -11,23 +20,35 @@ class ParserService:
     def __init__(self, converter: DocumentConverter):
         self.converter = converter
 
-    async def submit_parse_task(
-        self, filename: str, content: bytes, output_format: OutputFormat
+    async def save_and_submit_task(
+        self, upload_file: UploadFile, output_format: OutputFormat
     ) -> str:
-        """Submits the task to TaskIQ and returns the task_id."""
+        """Saves the uploaded file to disk and submits the task."""
+        file_uuid = uuid.uuid4().hex
+        _, ext = os.path.splitext(upload_file.filename)
+        if not ext:
+            ext = ".pdf"
+        save_filename = f"{file_uuid}{ext}"
+        save_path = UPLOAD_DIR / save_filename
+
+        async with await anyio.open_file(save_path, "wb") as out_file:
+            while content := await upload_file.read(1024 * 1024):
+                await out_file.write(content)
+
         result = await parse_document_task.kiq(
-            filename=filename,
-            content_hex=content.hex(),
+            filename=upload_file.filename,
+            file_path=str(save_path),
             output_format=output_format.value,
         )
         task_id = result.task_id
-        logger.info("submitted_parse_task", task_id=task_id, filename=filename)
+        logger.info(
+            "submitted_parse_task", task_id=task_id, filename=upload_file.filename
+        )
         return task_id
 
     async def get_task_result(self, task_id: str) -> TaskResultResponse | None:
-        """Queries the task result from Redis."""
-        from apps.backend.app.core.broker import broker
-
+        """Queries the task status from Redis, then fetches large payloads from disk."""
+        # 1. Ask Redis for the task status
         is_ready = await broker.result_backend.is_result_ready(task_id)
         if not is_ready:
             return TaskResultResponse(
@@ -35,8 +56,8 @@ class ParserService:
                 status=TaskStatus.PROCESSING,
             )
 
+        # 2. Get the result metadata from Redis
         result = await broker.result_backend.get_result(task_id)
-
         if result.is_err:
             return TaskResultResponse(
                 task_id=task_id,
@@ -44,36 +65,64 @@ class ParserService:
                 error=str(result.error),
             )
 
-        if not result.return_value:
-            # No result yet -> task is still running
-            return TaskResultResponse(
-                task_id=task_id,
-                status=TaskStatus.PROCESSING,
-            )
-
         data = result.return_value
         if not isinstance(data, dict):
             return TaskResultResponse(
                 task_id=task_id,
                 status=TaskStatus.FAILED,
-                error="Invalid result format returned from task.",
+                error="Invalid result format in Redis.",
             )
 
-        status_str = str(data.get("status", "processing"))
-        status = TaskStatus(status_str)
-
-        filename = data.get("filename")
-        output_format_str = data.get("output_format")
-        content = data.get("content")
-        error = data.get("error")
+        # 3. Use the disk reference (result_uri) to load the heavy payload
+        result_uri = data.get("result_uri")
+        if isinstance(result_uri, str):
+            path_obj = anyio.Path(result_uri)
+            if await path_obj.exists():
+                try:
+                    async with await anyio.open_file(result_uri, "r") as f:
+                        content = await f.read()
+                        disk_data = json.loads(content)
+                        return TaskResultResponse(**disk_data)
+                except Exception as e:
+                    logger.error(
+                        "failed_to_parse_result_json", task_id=task_id, error=str(e)
+                    )
+                    return TaskResultResponse(
+                        task_id=task_id,
+                        status=TaskStatus.FAILED,
+                        error=f"Corrupted disk result: {e}",
+                    )
 
         return TaskResultResponse(
             task_id=task_id,
-            status=status,
-            filename=str(filename) if filename is not None else None,
-            output_format=OutputFormat(str(output_format_str))
-            if output_format_str is not None
-            else None,
-            content=str(content) if content is not None else None,
-            error=str(error) if error is not None else None,
+            status=TaskStatus.FAILED,
+            error="Result file not found on disk despite task being marked ready in Redis.",
         )
+
+    async def get_all_tasks(self) -> list[TaskResultResponse]:
+        """Lists all tasks from the disk results directory."""
+        tasks = []
+        path_obj = anyio.Path(RESULTS_DIR)
+        if await path_obj.exists():
+            async for file in path_obj.iterdir():
+                if file.suffix == ".json":
+                    try:
+                        async with await anyio.open_file(file, "r") as f:
+                            content = await f.read()
+                            data = json.loads(content)
+                            tasks.append(TaskResultResponse(**data))
+                    except Exception as e:
+                        logger.error(
+                            "failed_to_read_task_json", file=str(file), error=str(e)
+                        )
+
+        # Sort tasks by created_at descending (newest first)
+        tasks.sort(
+            key=lambda t: (
+                t.created_at
+                if t.created_at
+                else datetime.min.replace(tzinfo=timezone.utc)
+            ),
+            reverse=True,
+        )
+        return tasks

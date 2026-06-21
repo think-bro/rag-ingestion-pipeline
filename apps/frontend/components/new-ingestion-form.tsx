@@ -28,7 +28,8 @@ export function NewIngestionForm({
   const [files, setFiles] = React.useState<globalThis.File[]>([]);
   const { createDummyTask } = useTasks();
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
+    maxSize: 100 * 1024 * 1024, // TODO: Remove or increase this limit once backend async PDF splitting is implemented
     onDrop: (acceptedFiles) => setFiles(acceptedFiles),
   });
 
@@ -162,6 +163,14 @@ export function NewIngestionForm({
                 </label>
                 <p className="text-pretty pl-1">to upload</p>
               </div>
+              <p className="mt-2 text-center text-xs text-muted-foreground/70">
+                PDF documents up to 100MB
+              </p>
+              {fileRejections.length > 0 && (
+                <p className="mt-3 text-center text-sm text-destructive">
+                  File is too large. Maximum size is 100MB.
+                </p>
+              )}
             </div>
           </div>
           {filesList.length > 0 && (

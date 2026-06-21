@@ -13,7 +13,6 @@ WORKDIR /workspace
 # Dependency caching
 COPY pyproject.toml uv.lock ./
 COPY apps/backend/pyproject.toml apps/backend/
-COPY apps/frontend/pyproject.toml apps/frontend/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev --package backend
