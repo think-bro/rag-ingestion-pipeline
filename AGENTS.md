@@ -1,17 +1,20 @@
 # AGENTS.md
 
-Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), parses them via Docling, and converts to structured Markdown or JSON. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
+Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown or JSON. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
 
 ## Tech Stack
 
 - Python 3.14, Docling, Pydantic, structlog
 - Backend: Litestar
-- Frontend: Streamlit
+- Frontend: Next.js 16 (App Router, static export), React 19, shadcn/ui, Tailwind CSS v4
+- State Management: Zustand (client state), TanStack Query (server state)
 - Task Queue: TaskIQ with Redis
 - Containerization: Docker, Docker Compose
-- Monorepo package manager: `uv` workspaces (never use `pip` or `poetry`)
-- Linting & formatting: `ruff`
-- Type checking: `ty`
+- Backend package manager: `uv` (never use `pip` or `poetry`)
+- Frontend package manager: `pnpm` (never use `npm` or `yarn`)
+- Backend linting & formatting: `ruff`
+- Frontend linting & formatting: `ultracite` / Biome
+- Type checking: `ty` (Python), `tsc` (TypeScript)
 - Task runner: `just`
 
 ## Project Structure
@@ -19,20 +22,52 @@ Document ingestion pipeline for RAG workflows. Accepts files (PDF, DOCX, etc.), 
 ```
 apps/
 ├── backend/                         # Litestar application
-│   ├── app/                         # Backend code
-│   │   ├── main.py
+│   ├── app/
+│   │   ├── main.py                  # App factory, lifespan, DI, CORS
 │   │   ├── core/
+│   │   │   ├── broker.py            # TaskIQ broker + Redis result backend
+│   │   │   └── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
 │   │   └── features/
+│   │       └── document_parsing/
+│   │           ├── controller.py    # HTTP endpoints (parse, tasks, delete)
+│   │           ├── service.py       # Business logic, file I/O, task submission
+│   │           ├── schemas.py       # Pydantic models, DTOs, enums
+│   │           └── tasks.py         # TaskIQ background task definition
 │   ├── pyproject.toml
 │   └── Dockerfile
-└── frontend/                        # Streamlit application
-    ├── main.py
-    ├── pyproject.toml
-    └── Dockerfile
+└── frontend/                        # Next.js application
+    ├── app/                         # App Router pages and layouts
+    │   ├── layout.tsx               # Root layout (fonts, providers, sidebar)
+    │   ├── page.tsx                 # Main page (empty state or task detail)
+    │   └── globals.css              # Tailwind CSS v4 + shadcn theme tokens
+    ├── components/
+    │   ├── app-layout.tsx           # SidebarProvider + breadcrumb header
+    │   ├── app-sidebar.tsx          # Sidebar with task list
+    │   ├── new-ingestion-form.tsx   # File upload form (react-dropzone)
+    │   ├── new-ingestion-modal.tsx  # Responsive dialog/drawer
+    │   ├── task-detail-view.tsx     # Parsed content display
+    │   ├── task-item.tsx            # Sidebar task entry with context menu
+    │   ├── state-card.tsx           # Empty/error state card
+    │   └── ui/                      # shadcn/ui primitives
+    ├── hooks/
+    │   ├── use-tasks.ts             # TanStack Query hooks (adaptive polling)
+    │   └── use-mobile.ts            # Responsive breakpoint hook
+    ├── store/
+    │   └── task-store.ts            # Zustand store (activeTaskId, modal state)
+    ├── lib/
+    │   ├── api.ts                   # Backend API client (fetch wrapper)
+    │   ├── providers.tsx            # QueryClientProvider setup
+    │   └── utils.ts                 # cn() utility
+    ├── biome.jsonc                  # Ultracite/Biome config
+    ├── components.json              # shadcn/ui registry config
+    ├── next.config.ts               # Static export + dev API proxy
+    ├── nginx.conf                   # Production: static serving + API reverse proxy
+    ├── Dockerfile                   # Multi-stage: Node → build → Nginx
+    └── package.json
 
-pyproject.toml                       # Workspace root config
-uv.lock                              # Unified workspace lockfile
-compose.yaml                         # Dev environment with hot-reload and model caching
+pyproject.toml                       # uv workspace root config
+uv.lock                              # Unified Python workspace lockfile
+compose.yaml                         # Dev environment (backend + worker + redis + optional frontend)
 justfile                             # Task runner commands
 ```
 
@@ -40,41 +75,45 @@ justfile                             # Task runner commands
 
 ### Docker (primary)
 
-- Dev server: `just dev` or `docker compose up --build`
+- Dev server (backend + worker + redis): `just dev` or `docker compose up --build`
+- Dev server (full stack incl. frontend): `just dev-all` or `docker compose --profile frontend up --build`
 - Stop: `just down` or `docker compose down`
 - Build only: `just build` or `docker compose build`
 
 ### Local (Without Docker)
 
-- Install dependencies: `just install` or `uv sync`
+- Install all dependencies: `just install` or `uv sync && pnpm --dir apps/frontend install`
 - Dev server (backend): `just dev-backend` or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`
 - Dev server (worker): `just dev-worker` or `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload`
-- Dev server (frontend): `just dev-frontend` or `uv run --package frontend streamlit run apps/frontend/main.py`
+- Dev server (frontend): `just dev-frontend` or `cd apps/frontend && pnpm dev`
+- Build frontend for production: `just build-frontend` or `pnpm --dir apps/frontend run build`
 
 ### Code quality (always local)
 
-- Lint: `just lint` or `uv run ruff check .`
-- Format: `just format` or `uv run ruff format .`
-- Type check: `just typecheck` or `uv run ty check`
+- Lint: `just lint` or `uv run ruff check . && pnpm --dir apps/frontend run check`
+- Format: `just format` or `uv run ruff format . && pnpm --dir apps/frontend run fix`
+- Type check: `just typecheck` or `uv run ty check && pnpm --dir apps/frontend run typecheck`
 - Run all checks: `just check`
 
 Always run `just check` before finalizing any work.
 
 ## Code Style
 
+### Backend (Python)
+
 - Use `structlog` for all logging in backend. Never use stdlib `logging`.
 - All functions must have full type annotations — signatures, return types, variables where non-obvious.
 - Use `structlog.get_logger()` at module level, not inside functions.
 - Prefer `async` handlers in controllers.
 - Use relative imports within a feature module (e.g., `from .service import ParserService`).
-- Use absolute imports for cross-feature or core references (e.g., `from apps.backend.app.core.config import settings`).
+- Use absolute imports for cross-feature or core references (e.g., `from apps.backend.app.core.config import UPLOAD_DIR`).
 - All comments, docstrings, and commit messages must be in English.
 
-## Frontend (Ultracite) Code Standards
+### Frontend (TypeScript)
 
-his project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
+This project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
 
-### Quick Reference
+#### Quick Reference
 
 - **Format code**: `pnpm dlx ultracite fix`
 - **Check for issues**: `pnpm dlx ultracite check`
@@ -84,11 +123,11 @@ Biome (the underlying engine) provides robust linting and formatting. Most issue
 
 ---
 
-### Core Principles
+#### Core Principles
 
 Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
 
-#### Type Safety & Explicitness
+##### Type Safety & Explicitness
 
 - Use explicit types for function parameters and return values when they enhance clarity
 - Prefer `unknown` over `any` when the type is genuinely unknown
@@ -96,7 +135,7 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Leverage TypeScript's type narrowing instead of type assertions
 - Use meaningful variable names instead of magic numbers - extract constants with descriptive names
 
-#### Modern JavaScript/TypeScript
+##### Modern JavaScript/TypeScript
 
 - Use arrow functions for callbacks and short functions
 - Prefer `for...of` loops over `.forEach()` and indexed `for` loops
@@ -105,14 +144,14 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Use destructuring for object and array assignments
 - Use `const` by default, `let` only when reassignment is needed, never `var`
 
-#### Async & Promises
+##### Async & Promises
 
 - Always `await` promises in async functions - don't forget to use the return value
 - Use `async/await` syntax instead of promise chains for better readability
 - Handle errors appropriately in async code with try-catch blocks
 - Don't use async functions as Promise executors
 
-#### React & JSX
+##### React & JSX
 
 - Use function components over class components
 - Call hooks at the top level only, never conditionally
@@ -127,14 +166,14 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
   - Include keyboard event handlers alongside mouse events
   - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
 
-#### Error Handling & Debugging
+##### Error Handling & Debugging
 
 - Remove `console.log`, `debugger`, and `alert` statements from production code
 - Throw `Error` objects with descriptive messages, not strings or other values
 - Use `try-catch` blocks meaningfully - don't catch errors just to rethrow them
 - Prefer early returns over nested conditionals for error cases
 
-#### Code Organization
+##### Code Organization
 
 - Keep functions focused and under reasonable cognitive complexity limits
 - Extract complex conditions into well-named boolean variables
@@ -142,14 +181,14 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Prefer simple conditionals over nested ternary operators
 - Group related code together and separate concerns
 
-#### Security
+##### Security
 
 - Add `rel="noopener"` when using `target="_blank"` on links
 - Avoid `dangerouslySetInnerHTML` unless absolutely necessary
 - Don't use `eval()` or assign directly to `document.cookie`
 - Validate and sanitize user input
 
-#### Performance
+##### Performance
 
 - Avoid spread syntax in accumulators within loops
 - Use top-level regex literals instead of creating them in loops
@@ -157,7 +196,7 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Avoid barrel files (index files that re-export everything)
 - Use proper image components (e.g., Next.js `<Image>`) over `<img>` tags
 
-#### Framework-Specific Guidance
+##### Framework-Specific Guidance
 
 **Next.js:**
 - Use Next.js `<Image>` component for images
@@ -167,19 +206,16 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 **React 19+:**
 - Use ref as a prop instead of `React.forwardRef`
 
-**Solid/Svelte/Vue/Qwik:**
-- Use `class` and `for` attributes (not `className` or `htmlFor`)
-
 ---
 
-### Testing
+##### Testing
 
 - Write assertions inside `it()` or `test()` blocks
 - Avoid done callbacks in async tests - use async/await instead
 - Don't use `.only` or `.skip` in committed code
 - Keep test suites reasonably flat - avoid excessive `describe` nesting
 
-### When Biome Can't Help
+##### When Biome Can't Help
 
 Biome's linter will catch most issues automatically. Focus your attention on:
 
@@ -197,7 +233,8 @@ Most formatting and common issues are automatically fixed by Biome. Run `pnpm dl
 
 ## Architecture
 
-This project uses a **monorepo architecture** managed by `uv` workspaces.
+This project uses a **monorepo architecture** with a split toolchain: `uv` for the Python backend and `pnpm` for the TypeScript frontend.
+
 The backend uses **feature-based architecture**. Each feature is a self-contained vertical slice.
 
 ### Adding a new feature (Backend)
@@ -218,15 +255,18 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
-1. `POST` endpoint accepts the request, kicks off a TaskIQ background task (`parse_document_task.kiq()`), and returns HTTP 202 with a `task_id`.
+1. `POST` endpoint accepts the request, saves the file to disk (`/storage/uploads/`), kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to disk, and returns HTTP 202 with a `task_id`.
 2. The actual processing is executed by a separate `worker` process via TaskIQ. This prevents blocking the main web server process.
 3. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `asyncio.to_thread()` within the worker task to avoid blocking the worker's event loop.
-4. A `GET /tasks/{task_id}` endpoint allows polling for task status and results by querying the Redis backend using TaskIQ's API.
-5. Task state and results are stored in Redis (`RedisAsyncResultBackend`), ensuring results persist across application restarts. Results are set to expire after a certain time (e.g. 1 hour).
-6. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
+4. The worker writes task state transitions to disk as JSON files (`/storage/results/{task_id}.json`). This is the source of truth for task results.
+5. A `GET /tasks/{task_id}` endpoint reads the task result directly from disk. A `GET /tasks` endpoint lists all tasks. A `DELETE /tasks/{task_id}` endpoint removes a task result.
+6. The frontend uses **adaptive polling** (2s when tasks are active, 10s when idle) via TanStack Query's `refetchInterval`.
+7. Only minimal metadata is returned to Redis (`RedisAsyncResultBackend`) to keep the Redis memory footprint low. Full parsed content stays on disk.
+8. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
 
 **Important Files:**
 - `apps/backend/app/core/broker.py`: Centralized definition for the TaskIQ broker and result backend.
+- `apps/backend/app/core/config.py`: Storage path configuration (`UPLOAD_DIR`, `RESULTS_DIR`).
 - `apps/backend/app/features/document_parsing/tasks.py`: Contains the actual TaskIQ tasks (`@broker.task()`).
 
 ### Singleton Services
@@ -235,9 +275,13 @@ Heavy resources like `DocumentConverter` (which loads ML models) are initialized
 
 ## Docker
 
-- The apps run inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
+- The backend and worker run inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
+- The frontend container is behind a `frontend` Docker Compose profile. Use `just dev-all` to include it, or run the frontend locally with `just dev-frontend` for faster iteration.
+- In production, the frontend is built as a static export and served by Nginx. Nginx also reverse-proxies `/api/` requests to the backend container.
 - ML model weights are persisted in named Docker volumes (`hf-models-cache`, `rapidocr-models-cache`) to avoid re-downloading on container restarts.
-- The Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
+- Task results and uploads are persisted in a `shared-storage` Docker volume mounted at `/workspace/storage`, shared between the backend and worker containers.
+- The backend Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
+- The frontend Dockerfile uses a three-stage build: dependencies → Next.js build → Nginx static serving.
 - Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume and permission setup.
 
 ## Git Conventions & Release Automation
@@ -248,13 +292,14 @@ Heavy resources like `DocumentConverter` (which loads ML models) are initialized
 - Example: `feat(document_parsing): Add PDF parsing support`
 
 This repository uses **Google Release Please** for automated semantic versioning based on commits.
-- **Do NOT** manually bump versions in `pyproject.toml` files or `uv.lock`.
+- **Do NOT** manually bump versions in `pyproject.toml`, `package.json`, or `uv.lock`.
 - Merging to `master` will trigger the `release-please` bot to automatically open a Release PR updating the versions and changelogs.
 - A secondary workflow will automatically sync `uv.lock` within that Release PR.
 
 ## Guardrails
 
-- Never modify `uv.lock` manually. Run `uv sync` or `uv add <package>` instead.
-- Never commit `.venv/`, `__pycache__/`, or build artifacts.
-- Never add dependencies without adding them to the respective `pyproject.toml` via `uv add --package <package_name> <dependency>`.
+- Never modify `uv.lock` or `pnpm-lock.yaml` manually. Run `uv sync` / `pnpm install` instead.
+- Never commit `.venv/`, `node_modules/`, `__pycache__/`, `.next/`, or build artifacts.
+- Never add Python dependencies without using `uv add --package <package_name> <dependency>`.
+- Never add frontend dependencies without using `pnpm --dir apps/frontend add <dependency>`.
 - Do not create test files yet — testing infrastructure has not been set up.

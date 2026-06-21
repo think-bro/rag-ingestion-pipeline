@@ -1,9 +1,9 @@
 # RAG Ingestion Pipeline
 
-A document ingestion pipeline for RAG (Retrieval-Augmented Generation) workflows. 
+An asynchronous document ingestion pipeline for RAG (Retrieval-Augmented Generation) workflows.
 
 ## Overview
-This project processes raw documents (like PDFs, DOCX, etc.) and prepares them for vector search. It is structured as a `uv` workspace monorepo containing a Litestar backend and a Streamlit frontend.
+This project processes raw documents (like PDFs, etc.) and prepares them for vector search. It is structured as a monorepo containing a Litestar backend and a Next.js frontend, with TaskIQ handling async processing.
 
 **Pipeline Stages:**
 1. **Parsing (Current Stage):** Extracts structured content from documents using Docling. Supports Markdown and JSON output formats.
@@ -11,16 +11,51 @@ This project processes raw documents (like PDFs, DOCX, etc.) and prepares them f
 3. **Embedding (Planned):** Generating vector embeddings for each chunk.
 4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
 
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend (Next.js)
+    participant B as Backend (Litestar)
+    participant R as Redis (TaskIQ)
+    participant W as Worker
+    participant D as Disk (/storage)
+
+    F->>B: POST /api/documents/parse (multipart file upload)
+    B->>D: Save file to disk (/storage/uploads/{uuid}.ext)
+    B->>D: Write initial task state (pending)
+    B->>R: Enqueue task (task_id, file_path, options)
+    B->>F: 202 Accepted {task_id: "abc-123"}
+
+    loop Every 2 seconds (adaptive polling)
+        F->>B: GET /api/documents/tasks/abc-123
+        B->>D: Read task result from disk
+        B->>F: {status: "processing"} or {status: "completed", content: "..."}
+    end
+
+    W->>R: Dequeue task
+    W->>D: Update task state (processing)
+    W->>D: Read uploaded file from disk
+    W->>W: Parse with Docling (in thread pool)
+    W->>D: Write final result to disk (completed/failed)
+    W->>D: Delete original uploaded file
+    W->>R: Return minimal metadata to Redis (TTL: 1 hour)
+```
+
 ## Tech Stack
-- **Backend Framework:** [Litestar](https://github.com/litestar-org/litestar)
-- **Frontend Framework:** [Streamlit](https://github.com/streamlit/streamlit)
+- **Backend Framework:** [Litestar](https://github.com/litestar-org/litestar) (Python 3.14)
+- **Frontend Framework:** [Next.js](https://github.com/vercel/next.js) 16 (App Router, static export)
+- **UI Components:** [shadcn/ui](https://github.com/shadcn-ui/ui) with [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) v4
 - **Task Queue:** [TaskIQ](https://github.com/taskiq-python/taskiq) with [Redis](https://github.com/redis/redis/)
 - **Document Parsing:** [Docling](https://github.com/docling-project/docling)
-- **Logging:** [structlog](https://github.com/hynek/structlog)
+- **State Management:** [Zustand](https://github.com/pmndrs/zustand), [TanStack Query](https://github.com/TanStack/query)
 - **Containerization:** [Docker](https://www.docker.com/)
-- **Package & Monorepo Management:** [uv workspaces](https://github.com/astral-sh/uv)
+- **Backend Package Management:** [uv](https://github.com/astral-sh/uv)
+- **Frontend Package Management:** [pnpm](https://github.com/pnpm/pnpm)
 - **Task Runner:** [just](https://github.com/casey/just)
-- **Quality & Typing:** [ruff](https://github.com/astral-sh/ruff) and [ty](https://github.com/astral-sh/ty)
+- **Backend Quality:** [ruff](https://github.com/astral-sh/ruff) (lint/format), [ty](https://github.com/astral-sh/ty) (type check)
+- **Frontend Quality:** [Ultracite](https://github.com/haydenbleasel/ultracite) / [Biome](https://github.com/biomejs/biome) (lint/format)
+- **Logging:** [structlog](https://github.com/hynek/structlog)
 
 ## Getting Started
 
@@ -28,8 +63,8 @@ This project processes raw documents (like PDFs, DOCX, etc.) and prepares them f
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
 
 For local development (without Docker):
-- Python 3.14+
-- `uv` installed
+- Python 3.14+, `uv`
+- Node.js 20+, `pnpm`
 
 ### Running the Application
 
@@ -37,7 +72,11 @@ The recommended way to run the project is through Docker. This handles all depen
 
 **With `just` (recommended):**
 ```bash
+# Start backend, worker, and Redis (frontend runs locally for HMR)
 just dev
+
+# Or start the entire stack including the Dockerized frontend
+just dev-all
 ```
 
 **Without `just`:**
@@ -45,7 +84,7 @@ just dev
 docker compose up --build
 ```
 
-The Backend API will be available at `http://localhost:8000`. <br>The Frontend UI will be available at `http://localhost:8501`.
+The Backend API will be available at `http://localhost:8000`. <br>The Frontend UI (when Dockerized) will be available at `http://localhost:3000`.
 
 To shut down:
 ```bash
@@ -57,40 +96,34 @@ just down          # or: docker compose down
 If you prefer to run without Docker (e.g. for faster iteration on code-only changes):
 
 ```bash
-# install dependencies
-uv sync
+# Install all dependencies (backend + frontend)
+just install       # or: uv sync && pnpm --dir apps/frontend install
 
-# start backend server
-uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
+# Start backend server
+just dev-backend   # or: uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
 
-# start worker process
-uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
+# Start worker process (in a separate terminal)
+just dev-worker    # or: uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
 
-# start frontend server
-uv run --package frontend streamlit run apps/frontend/main.py
+# Start frontend dev server (in a separate terminal, with HMR)
+just dev-frontend  # or: cd apps/frontend && pnpm dev
 ```
 
-Or with `just`:
-```bash
-just install       # uv sync
-just dev-backend   # start backend server without Docker
-just dev-worker    # start background worker without Docker
-just dev-frontend  # start frontend server without Docker
-```
+> **Note:** The Next.js dev server proxies `/api/*` requests to `http://127.0.0.1:8000` automatically via `next.config.ts` rewrites. No manual CORS setup needed for local development.
 
 ### Code Quality
 
-Linting, formatting, and type checking run locally regardless of how you run the app:
+Linting, formatting, and type checking run locally regardless of how you run the app. Both backend (Python) and frontend (TypeScript) toolchains run together:
 
 ```bash
-just check         # runs lint + format + typecheck sequentially across the workspace
+just check         # runs lint + format + typecheck for both backend and frontend
 ```
 
 Or individually:
 ```bash
-just lint          # or: uv run ruff check .
-just format        # or: uv run ruff format .
-just typecheck     # or: uv run ty check
+just lint          # ruff check . && pnpm --dir apps/frontend run check
+just format        # ruff format . && pnpm --dir apps/frontend run fix
+just typecheck     # ty check && pnpm --dir apps/frontend run typecheck
 ```
 
 ## Contributing

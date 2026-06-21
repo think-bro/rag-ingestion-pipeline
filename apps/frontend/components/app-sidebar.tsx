@@ -19,7 +19,7 @@ import { useTaskStore } from "@/store/task-store";
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { isMobile } = useSidebar();
-  const { activeTaskId, setActiveTaskId } = useTaskStore();
+  const { setActiveTaskId } = useTaskStore();
   const { data: tasks = [] } = useTasks();
 
   return (
@@ -78,7 +78,6 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
               ) : (
                 tasks.map((task) => (
                   <TaskItem
-                    isActive={task.task_id === activeTaskId}
                     isMobile={isMobile}
                     key={task.task_id}
                     onSelectTask={setActiveTaskId}

@@ -30,18 +30,33 @@ dev-worker:
 dev-frontend:
 	cd apps/frontend && pnpm dev
 
-# Update local venv so IDEs (VS Code, etc.) can resolve dependencies
+# Build frontend for production locally (useful for testing builds without Docker)
+build-frontend:
+	pnpm --dir apps/frontend run build
+
+# Start frontend production server locally
+start-frontend:
+	pnpm --dir apps/frontend run start
+
+# Update local dependencies for both backend and frontend
 install:
 	uv sync
+	pnpm --dir apps/frontend install
 
-# Run fast local linting (Ruff executes in milliseconds, no Docker needed)
+# Run fast local linting (Ruff for Python, Ultracite/Biome for frontend)
 lint:
 	uv run ruff check .
+	pnpm --dir apps/frontend run check
 
+# Format codebase (Ruff for Python, Ultracite/Biome for frontend)
 format:
 	uv run ruff format .
+	pnpm --dir apps/frontend run fix
 
+# Type check codebase (ty for Python, tsc for frontend)
 typecheck:
 	uv run ty check
+	pnpm --dir apps/frontend run typecheck
 
+# Run all checks
 check: lint format typecheck
