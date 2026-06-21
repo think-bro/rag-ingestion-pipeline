@@ -25,12 +25,13 @@ services:
     environment:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
-    command: litestar --app apps.backend.app.main:app run --host 0.0.0.0 --port 8000 --debug --reload
+    command: litestar --app apps.backend.app.main:app run --host 0.0.0.0 --port 8000 --debug --reload --reload-dir apps/backend
     volumes:
       - .:/workspace
       - /workspace/.venv
       - hf-models-cache:/workspace/models/hf
       - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
+      - shared-storage:/workspace/storage
     working_dir: /workspace
     restart: unless-stopped
     depends_on:
@@ -56,12 +57,13 @@ services:
     environment:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
-    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks
+    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload --reload-dir apps/backend
     volumes:
       - .:/workspace
       - /workspace/.venv
       - hf-models-cache:/workspace/models/hf
       - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
+      - shared-storage:/workspace/storage
     working_dir: /workspace
     restart: unless-stopped
     depends_on:
@@ -69,16 +71,12 @@ services:
         condition: service_healthy
 
   frontend:
+    profiles: ["frontend"]
     build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
+      context: apps/frontend
+      dockerfile: Dockerfile
     ports:
-      - "8501:8501"
-    command: streamlit run apps/frontend/main.py --server.port=8501 --server.address=0.0.0.0
-    volumes:
-      - .:/workspace
-      - /workspace/.venv
-    working_dir: /workspace
+      - "3000:8080"
     restart: unless-stopped
     depends_on:
       - backend
@@ -87,3 +85,4 @@ volumes:
   hf-models-cache:
   rapidocr-models-cache:
   redis-data:
+  shared-storage:

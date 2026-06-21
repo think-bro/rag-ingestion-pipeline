@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from docling.document_converter import DocumentConverter
-from litestar import Litestar, get
+from litestar import Litestar, get, Router
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
 from litestar.di import Provide
@@ -45,14 +45,19 @@ def create_app() -> Litestar:
     """Application factory function."""
     cors_config = CORSConfig(allow_origins=["*"])
 
+    api_router = Router(path="/api", route_handlers=[ParserController])
+
     return Litestar(
-        route_handlers=[ParserController, health_check],
+        route_handlers=[api_router, health_check],
         plugins=[StructlogPlugin()],
         lifespan=[app_lifespan],
         dependencies={
             "parser_service": Provide(provide_parser_service, sync_to_thread=False)
         },
         cors_config=cors_config,
+        request_max_body_size=100
+        * 1024
+        * 1024,  # TODO: Implement async PDF splitting to handle >100MB files without OOM
         debug=True,
     )
 
