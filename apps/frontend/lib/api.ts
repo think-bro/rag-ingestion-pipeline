@@ -59,4 +59,16 @@ export const api = {
     }
     return res.json();
   },
+
+  /**
+   * Deletes a task result.
+   */
+  async deleteTask(taskId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete task: ${res.statusText}`);
+    }
+  },
 };

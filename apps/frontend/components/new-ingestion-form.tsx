@@ -29,7 +29,7 @@ export function NewIngestionForm({
   onStateChange?: (state: { hasFiles: boolean; isPending: boolean }) => void;
 }) {
   const [files, setFiles] = React.useState<globalThis.File[]>([]);
-  const { setNewIngestionModalOpen } = useTaskStore();
+  const { setNewIngestionModalOpen, setActiveTaskId } = useTaskStore();
   const { mutateAsync, isPending } = useSubmitTask();
   const [format, setFormat] = React.useState("markdown");
 
@@ -87,10 +87,16 @@ export function NewIngestionForm({
     }
 
     try {
-      await mutateAsync({ file: files[0], format });
+      const uploadPromises = files.map((file) => mutateAsync({ file, format }));
+      const results = await Promise.all(uploadPromises);
+
       setFiles([]);
       onSuccess();
       setNewIngestionModalOpen(false);
+
+      if (results.length > 0) {
+        setActiveTaskId(results[0].task_id);
+      }
     } catch (error) {
       console.error("Upload failed", error);
       // TODO: Toast

@@ -3,7 +3,7 @@ import { createElement, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface CallToActionCardProps {
+interface StateCardProps {
   action?: {
     label: string | ReactNode;
     onClick: () => void;
@@ -19,14 +19,14 @@ interface CallToActionCardProps {
   title: string;
 }
 
-export function CallToActionCard({
+export function StateCard({
   title,
   description,
   icons = [],
   action,
   secondaryAction,
   className,
-}: CallToActionCardProps) {
+}: StateCardProps) {
   return (
     <div
       className={cn(

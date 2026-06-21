@@ -23,21 +23,21 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useDeleteTask } from "@/hooks/use-tasks";
 import type { TaskResultResponse } from "@/lib/api";
+import { useTaskStore } from "@/store/task-store";
 
 interface TaskItemProps {
-  isActive: boolean;
   isMobile: boolean;
   onSelectTask: (id: string) => void;
   task: TaskResultResponse;
 }
 
-export function TaskItem({
-  task,
-  isActive,
-  isMobile,
-  onSelectTask,
-}: TaskItemProps) {
+export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
+  const { activeTaskId, setActiveTaskId } = useTaskStore();
+  const isActive = activeTaskId === task.task_id;
+  const { mutateAsync: deleteTask, isPending: isDeleting } = useDeleteTask();
+
   let StatusIcon = Loader2Icon;
   let iconColor = "text-muted-foreground";
 
@@ -114,9 +114,13 @@ export function TaskItem({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={(e) => {
+            disabled={isDeleting}
+            onClick={async (e) => {
               e.stopPropagation();
-              // TODO: Implement delete ingestion
+              await deleteTask(task.task_id);
+              if (isActive) {
+                setActiveTaskId(null);
+              }
             }}
             variant="destructive"
           >

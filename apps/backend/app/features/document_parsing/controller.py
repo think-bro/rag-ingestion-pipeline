@@ -1,5 +1,5 @@
 import structlog
-from litestar import Controller, get, post
+from litestar import Controller, delete, get, post
 from litestar.datastructures import UploadFile
 from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotFoundException
@@ -74,3 +74,14 @@ class ParserController(Controller):
         Retrieves a list of all document parsing tasks.
         """
         return await parser_service.get_all_tasks()
+
+    @delete(path="/tasks/{task_id:str}", status_code=204)
+    async def delete_task_endpoint(
+        self,
+        task_id: str,
+        parser_service: ParserService,
+    ) -> None:
+        """
+        Deletes a document parsing task result.
+        """
+        await parser_service.delete_task(task_id)

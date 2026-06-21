@@ -1,8 +1,12 @@
 # --- DOCKER (EXECUTION AND MANAGEMENT) ---
 
-# Spin up the development environment and rebuild the image if necessary
+# Spin up the backend, worker, and redis (skips frontend for local dev)
 dev:
 	docker compose up --build
+
+# Spin up the ENTIRE stack including the dockerized frontend
+dev-all:
+	docker compose --profile frontend up --build
 
 # Shut down the system and remove containers
 down:
@@ -22,7 +26,7 @@ dev-backend:
 dev-worker:
 	uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
 
-# Fallback: Run frontend locally without Docker
+# Recommended: Run frontend locally with HMR (Hot Module Replacement)
 dev-frontend:
 	cd apps/frontend && pnpm dev
 

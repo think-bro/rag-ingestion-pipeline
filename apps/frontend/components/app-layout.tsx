@@ -24,7 +24,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
   const activeTask = tasks?.find((t) => t.task_id === activeTaskId);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-screen">
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b">

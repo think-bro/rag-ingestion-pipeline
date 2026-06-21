@@ -34,6 +34,7 @@ export function useTaskResult(taskId: string | null) {
       return api.getTaskResult(taskId);
     },
     enabled: !!taskId,
+    gcTime: 0,
     refetchInterval: (query) => {
       const task = query.state.data as TaskResultResponse | undefined;
       const isActive =
@@ -54,6 +55,20 @@ export function useSubmitTask() {
       api.submitTask(file, format),
     onSuccess: () => {
       // Invalidate the tasks query so it immediately refetches the new list
+      queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to delete a parsing task.
+ */
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: string) => api.deleteTask(taskId),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
     },
   });
