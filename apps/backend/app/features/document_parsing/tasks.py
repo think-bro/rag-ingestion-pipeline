@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timezone
 
 import anyio
@@ -43,6 +44,8 @@ async def parse_document_task(
     async with await anyio.open_file(result_path, "w") as f:
         await f.write(json.dumps(processing_data, indent=2))
 
+    start_time = time.perf_counter()
+
     try:
         result = await asyncio.to_thread(converter.convert, file_path)
         doc = result.document
@@ -56,7 +59,14 @@ async def parse_document_task(
         else:
             parsed_content = doc.export_to_markdown()
 
-        logger.info("completed_parse_task", task_id=task_id, filename=filename)
+        processing_time = time.perf_counter() - start_time
+
+        logger.info(
+            "completed_parse_task",
+            task_id=task_id,
+            filename=filename,
+            processing_time=processing_time,
+        )
 
         output_data = {
             "task_id": task_id,
@@ -65,11 +75,17 @@ async def parse_document_task(
             "output_format": output_format,
             "content": parsed_content,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "processing_time": processing_time,
         }
 
     except Exception as e:
+        processing_time = time.perf_counter() - start_time
         logger.exception(
-            "failed_parse_task", task_id=task_id, filename=filename, error=str(e)
+            "failed_parse_task",
+            task_id=task_id,
+            filename=filename,
+            error=str(e),
+            processing_time=processing_time,
         )
         output_data = {
             "task_id": task_id,
@@ -78,6 +94,7 @@ async def parse_document_task(
             "output_format": output_format,
             "error": str(e),
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "processing_time": processing_time,
         }
     finally:
         if file_path and os.path.exists(file_path):

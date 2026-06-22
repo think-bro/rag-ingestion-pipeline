@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSubmitTask } from "@/hooks/use-tasks";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
 export function NewIngestionForm({
@@ -72,7 +72,7 @@ export function NewIngestionForm({
               {file.name}
             </p>
             <p className="mt-0.5 text-pretty text-muted-foreground text-sm">
-              {file.size} bytes
+              {formatBytes(file.size)}
             </p>
           </div>
         </div>

@@ -11,6 +11,7 @@ export interface TaskResultResponse {
   error?: string;
   filename?: string;
   output_format?: string;
+  processing_time?: number;
   status: TaskStatus;
   task_id: string;
 }

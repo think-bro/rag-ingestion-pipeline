@@ -45,7 +45,10 @@ class TaskResultResponse(BaseModel):
     content: Optional[str] = None
     error: Optional[str] = None
     created_at: Optional[datetime] = None
+    processing_time: Optional[float] = None
 
 
 class TaskListDTO(PydanticDTO[TaskResultResponse]):
-    config = DTOConfig(include={"task_id", "status", "filename", "created_at"})
+    config = DTOConfig(
+        include={"task_id", "status", "filename", "created_at", "processing_time"}
+    )

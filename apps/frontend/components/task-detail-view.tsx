@@ -1,7 +1,15 @@
-import { AlertCircle, Ban, Bug, Loader2, Upload } from "lucide-react";
+import {
+  AlertCircle,
+  Ban,
+  Bug,
+  ClockIcon,
+  Loader2,
+  Upload,
+} from "lucide-react";
 import { StateCard } from "@/components/state-card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useTaskResult } from "@/hooks/use-tasks";
+import { formatProcessingTime } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
 function TaskLoadingState({
@@ -78,6 +86,15 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     <ScrollArea className="w-full flex-1 overflow-y-auto">
       <div className="flex flex-col gap-6 p-6">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          {data.status === "completed" &&
+            typeof data.processing_time === "number" && (
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-muted-foreground text-sm">
+                <ClockIcon className="size-4" />
+                <span>
+                  Processed in {formatProcessingTime(data.processing_time)}
+                </span>
+              </div>
+            )}
           <pre className="whitespace-pre-wrap text-sm">{data.content}</pre>
         </div>
       </div>
