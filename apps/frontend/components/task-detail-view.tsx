@@ -58,6 +58,22 @@ function TaskErrorState({
   );
 }
 
+function TaskPendingState({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center p-6 text-muted-foreground">
+      <ClockIcon className="mb-4 h-8 w-8 animate-pulse text-amber-500" />
+      <h3 className="font-medium text-foreground text-lg">{title}</h3>
+      {description && <p className="mt-2 text-sm">{description}</p>}
+    </div>
+  );
+}
+
 export function TaskDetailView({ taskId }: { taskId: string }) {
   const { data, isLoading, isError } = useTaskResult(taskId);
   const { setActiveTaskId } = useTaskStore();
@@ -73,7 +89,15 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       />
     );
   }
-  if (data.status === "pending" || data.status === "processing") {
+  if (data.status === "pending") {
+    return (
+      <TaskPendingState
+        description="Your document is in the queue and will be processed shortly."
+        title={`Waiting for ${data.filename || "Document"}`}
+      />
+    );
+  }
+  if (data.status === "processing") {
     return (
       <TaskLoadingState
         description="Please wait while the document is being parsed..."
