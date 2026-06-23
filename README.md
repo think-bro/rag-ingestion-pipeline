@@ -70,76 +70,80 @@ sequenceDiagram
 - **Frontend Quality:** [Ultracite](https://github.com/haydenbleasel/ultracite) / [Biome](https://github.com/biomejs/biome) (lint/format)
 - **Logging:** [structlog](https://github.com/hynek/structlog)
 
-## Getting Started
+## Getting Started (For Users)
+
+If you only want to use the application locally, you do not need any development tools installed.
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- [just](https://github.com/casey/just) command runner installed
 
-For local development (without Docker):
-- Python 3.14+, `uv`
-- Node.js 20+, `pnpm`
+### Installation & Running
 
-### Running the Application
-
-The recommended way to run the project is through Docker. This handles all dependencies, including Docling's ML models, inside the container.
-
-**With `just` (recommended):**
+1. Clone the repository and navigate into the project directory:
 ```bash
-# Start backend, worker, and Redis (frontend runs locally for HMR)
+git clone https://github.com/think-bro/rag-ingestion-pipeline.git
+cd rag-ingestion-pipeline
+```
+
+2. Start the application. This handles all dependencies, including Docling's ML models, and ensures maximum performance by utilizing multiple background workers.
+```bash
+# Starts the entire stack (Frontend, Backend, Worker, Redis) in stable mode
+just run
+```
+
+The Backend API will be available at `http://localhost:8000`. <br>
+The Frontend UI will be available at `http://localhost:3000`.
+
+To shut down the system:
+```bash
+just down
+```
+
+## Development Setup (For Contributors)
+
+If you are modifying the code, you will need the development toolchain. The development architecture utilizes multiple Docker Compose files and `develop.watch` for high-performance, cross-platform hot-reloading.
+
+### Development Prerequisites
+- Docker Desktop and `just`
+- Python 3.14+ and `uv`
+- Node.js 20+ and `pnpm`
+
+### Starting the Development Environment
+
+The development environment runs the backend services in Docker (with watch mode enabled) while the frontend runs natively on your machine for Next.js HMR.
+
+1. Start the backend services (in watch mode):
+```bash
 just dev
-
-# Or start the entire stack including the Dockerized frontend
-just dev-all
 ```
 
-**Without `just`:**
+2. Start the frontend development server (in a separate terminal):
 ```bash
-docker compose up --build
+# Install dependencies first if you haven't
+just install
+
+just dev-frontend
 ```
-
-The Backend API will be available at `http://localhost:8000`. <br>The Frontend UI (when Dockerized) will be available at `http://localhost:3000`.
-
-To shut down:
-```bash
-just down          # or: docker compose down
-```
-
-### Local Development
-
-If you prefer to run without Docker (e.g. for faster iteration on code-only changes):
-
-```bash
-# Install all dependencies (backend + frontend)
-just install       # or: uv sync && pnpm --dir apps/frontend install
-
-# Start backend server
-just dev-backend   # or: uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload
-
-# Start worker process (in a separate terminal)
-just dev-worker    # or: uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
-
-# Start frontend dev server (in a separate terminal, with HMR)
-just dev-frontend  # or: cd apps/frontend && pnpm dev
-```
-
-> **Note:** The Next.js dev server proxies `/api/*` requests to `http://127.0.0.1:8000` automatically via `next.config.ts` rewrites. No manual CORS setup needed for local development.
 
 ### Code Quality
 
 Linting, formatting, and type checking run locally regardless of how you run the app. Both backend (Python) and frontend (TypeScript) toolchains run together:
 
 ```bash
-just check         # runs lint + format + typecheck for both backend and frontend
+# Runs lint + format + typecheck for both backend and frontend
+just check
 ```
 
 Or individually:
 ```bash
-just lint          # ruff check . && pnpm --dir apps/frontend run check
-just format        # ruff format . && pnpm --dir apps/frontend run fix
-just typecheck     # ty check && pnpm --dir apps/frontend run typecheck
+just lint
+just format
+just typecheck
 ```
 
 ## Contributing
+
 We welcome contributions! To maintain a clean codebase, we follow a strict Pull Request workflow, please always work on a separate branch and never commit directly to `master`.
 
 We use **Conventional Commits** and **Google Release Please** for automated versioning and changelog generation. Please do not manually bump package versions.

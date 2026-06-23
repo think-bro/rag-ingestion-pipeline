@@ -4,43 +4,29 @@ Thank you for your interest in contributing to the RAG Ingestion Pipeline! This 
 
 ## Development Setup
 
-### Docker (Recommended)
+The primary development environment runs inside Docker using Docker Compose Watch for high-performance, cross-platform hot-reloading. This ensures consistent behavior across machines and handles heavy dependencies without polluting your host system.
 
-The primary development environment runs inside Docker. This ensures consistent behavior across machines and handles heavy dependencies (Docling, PyTorch) without polluting your host system.
-
-1. **Install Docker Desktop** and make sure it's running.
-2. **Start the dev environment:**
+1. **Install Prerequisites:** Ensure you have [Docker Desktop](https://www.docker.com/products/docker-desktop/) running and the [just](https://github.com/casey/just) command runner installed.
+2. **Start the backend services:**
    ```bash
-   just dev           # or: docker compose up --build
+   just dev
    ```
-   This builds the image (if needed), mounts your local code into the container with hot-reload enabled, and starts the Litestar backend at `http://localhost:8000`, the TaskIQ worker, and Redis.
-
-   > **Note:** The `just dev` command starts only the backend, worker, and Redis. The frontend is meant to run locally for the best development experience (Hot Module Replacement). Start it separately with `just dev-frontend`.
+   This command starts the Litestar backend, the TaskIQ worker, and Redis in watch mode. Any changes you make to the Python code will be instantly synced to the container without the I/O penalty of traditional bind mounts.
 
 3. **Start the frontend locally** (in a separate terminal):
    ```bash
-   just dev-frontend  # or: cd apps/frontend && pnpm dev
+   just install       # Install Node/Python dependencies for IDE support
+   just dev-frontend  # Start Next.js development server
    ```
-   The Next.js dev server starts at `http://localhost:3000` and proxies API requests to the backend automatically.
+   The Next.js dev server starts at `http://localhost:3000` and proxies API requests to the backend automatically. Running this locally provides the best Hot Module Replacement (HMR) experience.
 
-4. **Install local tooling** (for IDE support and code quality checks):
-   ```bash
-   just install       # or: uv sync && pnpm --dir apps/frontend install
-   ```
-   This creates a local `.venv` for Python and installs `node_modules` for TypeScript so your editor can resolve imports and run linters. You don't need this to run the app, Docker handles the backend, and `pnpm dev` handles the frontend, but your IDE will thank you.
+### Local Tooling
 
-### Local (Without Docker)
+While Docker handles the runtime environment, you should run `just install` on your host machine to create a local `.venv` for Python and install `node_modules` for TypeScript. This ensures your IDE (like VS Code or Cursor) can resolve imports, run linters, and provide accurate IntelliSense.
 
-If you prefer to skip Docker entirely:
+### Manual Fallbacks
 
-1. **Install tools:** Ensure you have Python 3.14+, `uv`, Node.js 20+, `pnpm`, and optionally `just` installed.
-2. **Install dependencies:** `just install` (or `uv sync && pnpm --dir apps/frontend install`).
-3. **Start Redis:** You'll need a local Redis instance running on `localhost:6379`.
-4. **Start the backend server:** `just dev-backend` (or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`).
-5. **Start the worker process:** `just dev-worker` (or `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload`).
-6. **Start the frontend server:** `just dev-frontend` (or `cd apps/frontend && pnpm dev`).
-
-Note that local development requires your system to have all native dependencies (e.g. OpenCV libraries) that Docker provides out of the box.
+If you need to debug specific components without Docker, the `justfile` provides fallback commands like `just dev-backend` and `just dev-worker`. However, the Docker Watch environment (`just dev`) is the strictly recommended path for all contributors.
 
 ## Project Architecture
 
@@ -87,21 +73,20 @@ This runs the linting, formatting, and type-checking steps sequentially for both
 
 ## Common Commands
 
-| Task | `just` | Manual |
-| :--- | :--- | :--- |
-| Start dev environment (backend only) | `just dev` | `docker compose up --build` |
-| Start entire stack (incl. frontend) | `just dev-all` | `docker compose --profile frontend up --build` |
-| Stop dev environment | `just down` | `docker compose down` |
-| Build image only | `just build` | `docker compose build` |
-| Start backend locally | `just dev-backend` | `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload` |
-| Start worker locally | `just dev-worker` | `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload` |
-| Start frontend locally | `just dev-frontend` | `cd apps/frontend && pnpm dev` |
-| Build frontend for production | `just build-frontend` | `pnpm --dir apps/frontend run build` |
-| Install all dependencies | `just install` | `uv sync && pnpm --dir apps/frontend install` |
-| Lint | `just lint` | `uv run ruff check . && pnpm --dir apps/frontend run check` |
-| Format | `just format` | `uv run ruff format . && pnpm --dir apps/frontend run fix` |
-| Type check | `just typecheck` | `uv run ty check && pnpm --dir apps/frontend run typecheck` |
-| Run all checks | `just check` | run lint, format, typecheck sequentially |
+We strictly use `just` to orchestrate our workflows. You can view all available commands by running `just --list` in your terminal.
+
+| Command | Description |
+| :--- | :--- |
+| `just run` | Starts the entire stack (including frontend) in stable mode for end-users. |
+| `just dev` | Starts the backend, worker, and Redis in watch mode (hot-reload active) for development. |
+| `just dev-frontend` | Starts the Next.js development server locally with HMR. |
+| `just down` | Shuts down the system and removes all containers. |
+| `just build` | Rebuilds the Docker images without starting the containers. |
+| `just install` | Installs local dependencies for both backend (`uv`) and frontend (`pnpm`). |
+| `just check` | Runs linting, formatting, and type-checking sequentially for the entire codebase. |
+| `just lint` | Runs `ruff check` and Biome/Ultracite linting. |
+| `just format` | Auto-formats code using `ruff format` and Biome/Ultracite. |
+| `just typecheck` | Runs static type checking (`ty` for Python, `tsc` for TypeScript). |
 
 ## Git & Branching Workflow
 

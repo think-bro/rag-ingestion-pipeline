@@ -71,29 +71,25 @@ compose.yaml                         # Dev environment (backend + worker + redis
 justfile                             # Task runner commands
 ```
 
-## Commands
+## Essential Commands
 
-### Docker (primary)
+**Constraint:** Do not use raw `docker compose` or direct `uv`/`pnpm` run commands for orchestration. Rely entirely on the `just` task runner.
 
-- Dev server (backend + worker + redis): `just dev` or `docker compose up --build`
-- Dev server (full stack incl. frontend): `just dev-all` or `docker compose --profile frontend up --build`
-- Stop: `just down` or `docker compose down`
-- Build only: `just build` or `docker compose build`
+### Execution
 
-### Local (Without Docker)
+- Run Full Stack (Stable): `just run` (Frontend, Backend, Worker, Redis). No watch mode.
+- Run Dev Services (Watch Mode): `just dev` (Backend, Worker, Redis). Instant sync via Docker Compose Watch.
+- Run Frontend Locally (HMR): `just dev-frontend` (Proxies to Backend).
+- Stop System: `just down`
+- Rebuild Images: `just build`
 
-- Install all dependencies: `just install` or `uv sync && pnpm --dir apps/frontend install`
-- Dev server (backend): `just dev-backend` or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`
-- Dev server (worker): `just dev-worker` or `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload`
-- Dev server (frontend): `just dev-frontend` or `cd apps/frontend && pnpm dev`
-- Build frontend for production: `just build-frontend` or `pnpm --dir apps/frontend run build`
+### Development & Tooling
 
-### Code quality (always local)
-
-- Lint: `just lint` or `uv run ruff check . && pnpm --dir apps/frontend run check`
-- Format: `just format` or `uv run ruff format . && pnpm --dir apps/frontend run fix`
-- Type check: `just typecheck` or `uv run ty check && pnpm --dir apps/frontend run typecheck`
-- Run all checks: `just check`
+- Install Dependencies: `just install`
+- Run All Checks: `just check` (Runs lint, format, and typecheck sequentially).
+- Format Code: `just format`
+- Lint Code: `just lint`
+- Type Check: `just typecheck`
 
 Always run `just check` before finalizing any work.
 
@@ -277,16 +273,17 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 
 Heavy resources like `DocumentConverter` (which loads ML models) are initialized once in `app_lifespan` and stored on `app.state`. Services that depend on these resources are also created once and injected via Litestar's DI system (`Provide`).
 
-## Docker
+## Docker Architecture
 
-- The backend and worker run inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
-- The frontend container is behind a `frontend` Docker Compose profile. Use `just dev-all` to include it, or run the frontend locally with `just dev-frontend` for faster iteration.
+- The base `compose.yaml` defines the stable production-like environment.
+- The `compose.dev.yaml` acts as an override file for development. It uses `develop.watch` (Docker Compose Watch) to sync files from the host to the container instantly. It does **not** use bind mounts for code directories to preserve cross-platform I/O performance.
+- The frontend container is behind a `frontend` Docker Compose profile. Use `just run` to include it, or run the frontend locally with `just dev-frontend` for faster iteration during active development.
 - In production, the frontend is built as a static export and served by Nginx. Nginx also reverse-proxies `/api/` requests to the backend container.
 - ML model weights are persisted in named Docker volumes (`hf-models-cache`, `rapidocr-models-cache`) to avoid re-downloading on container restarts.
 - Task results and uploads are persisted in a `shared-storage` Docker volume mounted at `/workspace/storage`, shared between the backend and worker containers.
 - The backend Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
 - The frontend Dockerfile uses a three-stage build: dependencies → Next.js build → Nginx static serving.
-- Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume and permission setup.
+- Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume, network, and permission setup.
 
 ## Git Conventions & Release Automation
 
