@@ -17,18 +17,12 @@ class TaskStatus(enum.StrEnum):
 
 class OutputFormat(enum.StrEnum):
     MARKDOWN = "markdown"
-    JSON = "json"
+    # TODO: Add support for JSON and other output formats later
 
 
 class InputFormat(enum.StrEnum):
     PDF = "pdf"
-    DOCX = "docx"
-    PPTX = "pptx"
-    XLSX = "xlsx"
-    HTML = "html"
-    IMAGE = "image"
-    ASCIIDOC = "asciidoc"
-    MD = "md"
+    # TODO: Add support for other input formats (DOCX, PPTX, XLSX, HTML, IMAGE, ASCIIDOC, MD) later
 
 
 class TaskResponse(BaseModel):

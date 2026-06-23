@@ -1,5 +1,5 @@
 import asyncio
-import json
+
 import os
 import time
 from datetime import datetime, timezone
@@ -11,7 +11,7 @@ from taskiq import Context, TaskiqDepends
 
 from apps.backend.app.core.broker import broker
 from apps.backend.app.core.config import RESULTS_DIR, UPLOAD_DIR
-from .schemas import OutputFormat
+
 
 logger = structlog.get_logger()
 
@@ -50,13 +50,9 @@ async def parse_document_task(
         doc = result.document
 
         parsed_content = ""
-        fmt = OutputFormat(output_format)
-        if fmt == OutputFormat.MARKDOWN:
-            parsed_content = doc.export_to_markdown()
-        elif fmt == OutputFormat.JSON:
-            parsed_content = json.dumps(doc.export_to_dict(), indent=2)
-        else:
-            parsed_content = doc.export_to_markdown()
+
+        # TODO: Add support for JSON and other output formats later
+        parsed_content = doc.export_to_markdown()
 
         processing_time = time.perf_counter() - start_time
 

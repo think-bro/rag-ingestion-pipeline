@@ -6,7 +6,7 @@ An asynchronous document ingestion pipeline for RAG (Retrieval-Augmented Generat
 This project processes raw documents (like PDFs, etc.) and prepares them for vector search. It is structured as a monorepo containing a Litestar backend and a Next.js frontend, with TaskIQ handling async processing.
 
 **Pipeline Stages:**
-1. **Parsing (Current Stage):** Extracts structured content from documents using Docling. Supports Markdown and JSON output formats.
+1. **Parsing (Current Stage):** Extracts structured content from documents using Docling. Outputs structured Markdown.
 2. **Chunking (Planned):** Splitting the parsed document into semantic chunks.
 3. **Embedding (Planned):** Generating vector embeddings for each chunk.
 4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
