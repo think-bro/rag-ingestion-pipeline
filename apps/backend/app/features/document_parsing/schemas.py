@@ -10,6 +10,7 @@ from litestar.contrib.pydantic import PydanticDTO
 class TaskStatus(enum.StrEnum):
     PENDING = "pending"
     PROCESSING = "processing"
+    CANCELLING = "cancelling"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"

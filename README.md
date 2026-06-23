@@ -44,14 +44,27 @@ sequenceDiagram
         B->>D: Read content from disk ONLY IF completed
         B->>F: {status: "processing"} or {status: "completed", content: "..."}
     end
+    
+    opt User Cancels Task
+        F->>B: POST /api/documents/tasks/abc-123/cancel
+        B->>R: Write cancellation flag (cancel_task:abc-123)
+        B->>F: 202 Accepted {status: "cancelling"}
+    end
 
-    Note over W,D: Background Processing
+    Note over W,D: Background Processing (1 Task per Worker)
     W->>R: Dequeue task
-    W->>D: Read uploaded file from disk
-    W->>W: Parse with Docling (in thread pool)
+    W->>W: Spawn isolated subprocess (parse_worker.py)
+    loop Polling Loop (1s)
+        W->>R: Check cancellation flag
+        opt If Cancelled
+            W->>W: Send SIGTERM to subprocess
+            W->>R: Update task state to cancelled
+        end
+    end
+    W->>D: Read JSON IPC result from subprocess
     W->>D: Delete original uploaded file (file_id)
     W->>D: Write final parsed content to disk (.md)
-    W->>R: Update task state to completed in Redis Hash
+    W->>R: Update task state to completed or failed
     
     Note over W,D: Cron Job (Hourly)
     W->>D: Clean up orphaned files older than 24h

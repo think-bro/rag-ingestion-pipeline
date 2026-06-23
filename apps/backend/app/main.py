@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from docling.document_converter import DocumentConverter
 from litestar import Litestar, get, Router
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
@@ -31,15 +30,11 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     app.state.redis_pool = await get_redis_pool()
 
     app.state.redis = aioredis.Redis(connection_pool=app.state.redis_pool)
-
-    app.state.converter = DocumentConverter()
     app.state.parser_service = ParserService(
-        converter=app.state.converter,
         redis=app.state.redis,
     )
     yield
 
-    del app.state.converter
     del app.state.parser_service
 
     await app.state.redis_pool.disconnect()

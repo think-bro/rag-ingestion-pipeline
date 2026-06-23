@@ -23,7 +23,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useDeleteTask } from "@/hooks/use-tasks";
+import { useCancelTask, useDeleteTask } from "@/hooks/use-tasks";
 import type { TaskResultResponse } from "@/lib/api";
 import { useTaskStore } from "@/store/task-store";
 
@@ -37,6 +37,7 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
   const { activeTaskId, setActiveTaskId } = useTaskStore();
   const isActive = activeTaskId === task.task_id;
   const { mutateAsync: deleteTask, isPending: isDeleting } = useDeleteTask();
+  const { mutateAsync: cancelTask, isPending: isCancelling } = useCancelTask();
 
   let StatusIcon = Loader2Icon;
   let iconColor = "text-muted-foreground";
@@ -46,6 +47,8 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
     iconColor = "text-amber-500";
   } else if (task.status === "processing") {
     iconColor = "text-blue-500 animate-spin";
+  } else if (task.status === "cancelling") {
+    iconColor = "text-orange-500 animate-spin";
   } else if (task.status === "completed") {
     StatusIcon = CheckCircle2Icon;
     iconColor = "text-green-500";
@@ -104,9 +107,13 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
             <span>Rename Ingestion</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={(e) => {
+            disabled={
+              isCancelling ||
+              (task.status !== "pending" && task.status !== "processing")
+            }
+            onClick={async (e) => {
               e.stopPropagation();
-              // TODO: Implement cancel ingestion
+              await cancelTask(task.task_id);
             }}
           >
             <XCircleIcon className="mr-2 size-4 text-muted-foreground" />
@@ -117,7 +124,8 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
             disabled={
               isDeleting ||
               task.status === "pending" ||
-              task.status === "processing"
+              task.status === "processing" ||
+              task.status === "cancelling"
             }
             onClick={async (e) => {
               e.stopPropagation();

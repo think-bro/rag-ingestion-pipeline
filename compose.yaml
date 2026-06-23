@@ -55,7 +55,7 @@ services:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
       - OMP_NUM_THREADS=3
-    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --workers 2
+    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --workers 2 --max-async-tasks 1
     volumes:
       - hf-models-cache:/workspace/models/hf
       - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models

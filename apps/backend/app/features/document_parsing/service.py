@@ -6,11 +6,15 @@ from typing import Any
 import structlog
 from anyio import Path, open_file, to_thread
 import pypdfium2 as pdfium
-from docling.document_converter import DocumentConverter
 from litestar.datastructures import UploadFile
 
 
-from apps.backend.app.core.config import RESULTS_DIR, UPLOAD_DIR
+from apps.backend.app.core.config import (
+    RESULTS_DIR,
+    UPLOAD_DIR,
+    CANCEL_KEY_PREFIX,
+    CANCEL_KEY_TTL,
+)
 from .schemas import TaskResultResponse, TaskStatus, UploadResponse, ParseRequest
 from .tasks import parse_document_task
 
@@ -18,8 +22,7 @@ logger = structlog.get_logger()
 
 
 class ParserService:
-    def __init__(self, converter: DocumentConverter, redis: Any):
-        self.converter = converter
+    def __init__(self, redis: Any):
         self.redis = redis
 
     async def upload_file(self, upload_file: UploadFile) -> UploadResponse:
@@ -186,3 +189,27 @@ class ParserService:
             logger.info("deleted_task_result", task_id=task_id)
         except Exception as e:
             logger.error("failed_to_delete_task_result", task_id=task_id, error=str(e))
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancels an ongoing parsing task."""
+        task_data = await self.redis.hgetall(f"task:{task_id}")
+        if not task_data:
+            return False
+
+        current_status = task_data.get("status")
+        if current_status not in [
+            TaskStatus.PENDING.value,
+            TaskStatus.PROCESSING.value,
+            TaskStatus.CANCELLING.value,
+        ]:
+            return False
+
+        # Set the cancellation flag in Redis
+        cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
+        await self.redis.set(cancel_key, "1", ex=CANCEL_KEY_TTL)
+
+        # Update task status to cancelling
+        await self.redis.hset(f"task:{task_id}", "status", TaskStatus.CANCELLING.value)
+
+        logger.info("initiated_task_cancellation", task_id=task_id)
+        return True

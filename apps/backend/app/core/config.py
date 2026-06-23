@@ -11,3 +11,9 @@ RESULTS_DIR = STORAGE_DIR / "results"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Task Cancellation Constants
+CANCEL_KEY_PREFIX = "cancel_task:"
+CANCEL_KEY_TTL = 3600  # 1 hour
+SUBPROCESS_POLL_INTERVAL = 1.0  # seconds
+SUBPROCESS_TERMINATE_TIMEOUT = 3.0  # seconds

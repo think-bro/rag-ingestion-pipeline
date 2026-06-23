@@ -263,14 +263,16 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 
 1. **Upload Phase**: `POST /api/v1/documents/uploads` endpoint accepts a multipart file, saves it to `/storage/uploads/`, calculates metadata (e.g., page count), and returns `file_id`.
 2. **Parse Phase**: `POST /api/v1/documents/parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to a Redis Hash (`task:{task_id}`), and returns HTTP 202 with a `task_id`.
-3. The actual processing is executed by a separate `worker` process via TaskIQ. This prevents blocking the main web server process.
-4. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `anyio.to_thread.run_sync()` within the worker task to avoid blocking the worker's event loop.
-5. The worker writes task state transitions (metadata) to Redis Hashes (`task:{task_id}`). This is the source of truth for task status. The large parsed content is written to disk as `.md` files (`/storage/results/{task_id}.md`) to save Redis memory.
-6. A `GET /api/v1/documents/tasks/{task_id}` endpoint reads the task metadata from Redis and content from disk. A `GET /api/v1/documents/tasks` endpoint lists all tasks from Redis using a pipeline. A `DELETE /api/v1/documents/tasks/{task_id}` endpoint removes the Redis Hash and the `.md` file.
-7. The frontend uses **adaptive polling** (2s when tasks are active, 10s when idle) via TanStack Query's `refetchInterval`.
-8. Only minimal metadata is returned to Redis (`RedisAsyncResultBackend`) to keep the Redis memory footprint low. Full parsed content stays on disk.
-9. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
-10. A background cron task (`cleanup_orphaned_uploads_task`) runs hourly to delete uploaded files that were abandoned before parsing (older than 24 hours).
+3. The actual processing is executed by a separate `worker` process via TaskIQ. To prevent Out-Of-Memory (OOM) errors, the worker is strictly limited to 1 concurrent task (`--max-async-tasks 1`).
+4. To support graceful cancellation, CPU-intensive work (e.g., `DocumentConverter.convert()`) is isolated into a separate OS subprocess (`parse_worker.py`). The TaskIQ worker runs an asynchronous polling loop (`asyncio.create_subprocess_exec`) to monitor the subprocess and a cancellation flag in Redis.
+5. If a user cancels a task (`POST /api/v1/documents/tasks/{task_id}/cancel`), a flag is written to Redis. The worker detects this, sends a `SIGTERM` to the subprocess to kill it gracefully, and updates the state.
+6. The subprocess communicates back to the parent worker using a temporary JSON file (IPC) to avoid `stdout` pipe deadlocks with massive Markdown outputs.
+7. The worker writes task state transitions (metadata) to Redis Hashes (`task:{task_id}`). This is the source of truth for task status. The large parsed content is written to disk as `.md` files (`/storage/results/{task_id}.md`) to save Redis memory.
+8. A `GET /api/v1/documents/tasks/{task_id}` endpoint reads the task metadata from Redis and content from disk. A `GET /api/v1/documents/tasks` endpoint lists all tasks from Redis using a pipeline. A `DELETE /api/v1/documents/tasks/{task_id}` endpoint removes the Redis Hash and the `.md` file (guarded against active tasks).
+9. The frontend uses **adaptive polling** (2s when tasks are active/cancelling, 10s when idle) via TanStack Query's `refetchInterval`.
+10. Only minimal metadata is returned to Redis (`RedisAsyncResultBackend`) to keep the Redis memory footprint low. Full parsed content stays on disk.
+11. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
+12. A background cron task (`cleanup_orphaned_uploads_task`) runs hourly to delete uploaded files that were abandoned before parsing (older than 24 hours).
 
 **Important Files:**
 - `apps/backend/app/core/broker.py`: Centralized definition for the TaskIQ broker and result backend.

@@ -1,6 +1,7 @@
 export type TaskStatus =
   | "pending"
   | "processing"
+  | "cancelling"
   | "completed"
   | "failed"
   | "cancelled";
@@ -115,5 +116,20 @@ export const api = {
     if (!res.ok) {
       throw new Error(`Failed to delete task: ${res.statusText}`);
     }
+  },
+
+  /**
+   * Cancels an ongoing task.
+   */
+  async cancelTask(
+    taskId: string
+  ): Promise<{ task_id: string; status: string; message: string }> {
+    const res = await fetch(`${API_BASE}/tasks/${taskId}/cancel`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to cancel task: ${res.statusText}`);
+    }
+    return res.json();
   },
 };

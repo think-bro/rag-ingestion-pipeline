@@ -9,8 +9,16 @@ import structlog
 from litestar.datastructures import State
 from taskiq import Context, TaskiqDepends
 
+import json
 from apps.backend.app.core.broker import broker
-from apps.backend.app.core.config import RESULTS_DIR, UPLOAD_DIR
+from apps.backend.app.core.config import (
+    RESULTS_DIR,
+    UPLOAD_DIR,
+    CANCEL_KEY_PREFIX,
+    SUBPROCESS_POLL_INTERVAL,
+    SUBPROCESS_TERMINATE_TIMEOUT,
+)
+from apps.backend.app.features.document_parsing.schemas import TaskStatus
 
 
 logger = structlog.get_logger()
@@ -25,18 +33,26 @@ async def parse_document_task(
     state: State = TaskiqDepends(),
 ) -> dict:
     """
-    TaskIQ task: Parses the document from disk and writes the final JSON to disk.
+    TaskIQ task: Parses the document using a subprocess with cancellation polling.
     """
-    converter = state.converter
     redis = state.redis
     task_id = context.message.task_id
 
     logger.info("started_parse_task", task_id=task_id, filename=filename)
 
-    # Write 'processing' state to Redis immediately
+    # 1. Pre-emptive cancel check
+    cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
+    if await redis.exists(cancel_key):
+        logger.info("task_cancelled_before_start", task_id=task_id)
+        await redis.hset(f"task:{task_id}", "status", TaskStatus.CANCELLED.value)
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+        return {"task_id": task_id, "status": TaskStatus.CANCELLED.value}
+
+    # Write 'processing' state to Redis
     processing_data = {
         "task_id": task_id,
-        "status": "processing",
+        "status": TaskStatus.PROCESSING.value,
         "filename": filename,
         "output_format": output_format,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -44,33 +60,97 @@ async def parse_document_task(
     await redis.hset(f"task:{task_id}", mapping=processing_data)
 
     start_time = time.perf_counter()
+    output_metadata = {}
+    parsed_content = ""
+    output_json_path = str(RESULTS_DIR / f"{task_id}_temp.json")
 
     try:
-        result = await asyncio.to_thread(converter.convert, file_path)
-        doc = result.document
-
-        parsed_content = ""
-
-        # TODO: Add support for JSON and other output formats later
-        parsed_content = doc.export_to_markdown()
-
-        processing_time = time.perf_counter() - start_time
-
-        logger.info(
-            "completed_parse_task",
-            task_id=task_id,
-            filename=filename,
-            processing_time=processing_time,
+        # Start subprocess
+        process = await asyncio.create_subprocess_exec(
+            "python",
+            "-m",
+            "apps.backend.app.features.document_parsing.parse_worker",
+            file_path,
+            output_format,
+            output_json_path,
         )
 
-        output_metadata = {
-            "task_id": task_id,
-            "status": "completed",
-            "filename": filename,
-            "output_format": output_format,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "processing_time": processing_time,
-        }
+        # Polling loop
+        while True:
+            # Wait for process to complete OR poll interval to expire
+            try:
+                await asyncio.wait_for(process.wait(), timeout=SUBPROCESS_POLL_INTERVAL)
+                break  # Process finished
+            except asyncio.TimeoutError:
+                pass  # Poll interval expired, check cancel flag
+
+            # Check cancel flag
+            if await redis.exists(cancel_key):
+                logger.info("task_cancellation_requested", task_id=task_id)
+
+                # Graceful termination
+                process.terminate()
+                try:
+                    await asyncio.wait_for(
+                        process.wait(), timeout=SUBPROCESS_TERMINATE_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    # Force kill if hung
+                    process.kill()
+                    await process.wait()
+
+                await redis.delete(cancel_key)
+
+                output_metadata = {
+                    "task_id": task_id,
+                    "status": TaskStatus.CANCELLED.value,
+                    "filename": filename,
+                    "output_format": output_format,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "processing_time": time.perf_counter() - start_time,
+                }
+                logger.info("task_cancelled_successfully", task_id=task_id)
+                break
+
+        # Process finished normally
+        if not output_metadata:
+            if process.returncode == 0:
+                # Success
+                try:
+                    with open(output_json_path, "r", encoding="utf-8") as f:
+                        result_json = json.load(f)
+
+                    if "error" in result_json:
+                        raise Exception(result_json["error"])
+                    parsed_content = result_json["content"]
+
+                    processing_time = time.perf_counter() - start_time
+                    logger.info(
+                        "completed_parse_task",
+                        task_id=task_id,
+                        filename=filename,
+                        processing_time=processing_time,
+                    )
+
+                    output_metadata = {
+                        "task_id": task_id,
+                        "status": TaskStatus.COMPLETED.value,
+                        "filename": filename,
+                        "output_format": output_format,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "processing_time": processing_time,
+                    }
+                except Exception as e:
+                    raise Exception(f"Failed to read result: {str(e)}")
+            else:
+                # Failed execution (not cancelled, since we broke the loop)
+                try:
+                    with open(output_json_path, "r", encoding="utf-8") as f:
+                        result_json = json.load(f)
+                        error_msg = result_json.get("error", "Unknown error")
+                except Exception:
+                    error_msg = "Unknown error"
+                raise Exception(f"Worker exited with {process.returncode}: {error_msg}")
 
     except Exception as e:
         processing_time = time.perf_counter() - start_time
@@ -83,7 +163,7 @@ async def parse_document_task(
         )
         output_metadata = {
             "task_id": task_id,
-            "status": "failed",
+            "status": TaskStatus.FAILED.value,
             "filename": filename,
             "output_format": output_format,
             "error": str(e),
@@ -93,10 +173,12 @@ async def parse_document_task(
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
+        if os.path.exists(output_json_path):
+            os.remove(output_json_path)
 
     # Write content to disk asynchronously ONLY IF completed
     result_path = RESULTS_DIR / f"{task_id}.md"
-    if output_metadata["status"] == "completed":
+    if output_metadata.get("status") == TaskStatus.COMPLETED.value:
         async with await open_file(result_path, "w", encoding="utf-8") as f:
             await f.write(parsed_content)
 
@@ -106,8 +188,10 @@ async def parse_document_task(
     # Return minimal data to Redis Result Backend
     return {
         "task_id": task_id,
-        "status": output_metadata["status"],
-        "result_uri": str(result_path),
+        "status": output_metadata.get("status"),
+        "result_uri": str(result_path)
+        if output_metadata.get("status") == TaskStatus.COMPLETED.value
+        else None,
     }
 
 

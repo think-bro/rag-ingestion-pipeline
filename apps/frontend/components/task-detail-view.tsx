@@ -21,7 +21,7 @@ function TaskLoadingState({
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6 text-muted-foreground">
-      <Loader2 className="mb-4 h-8 w-8 animate-spin text-blue-500" />
+      <Loader2 className="mb-4 h-8 w-8 animate-spin" />
       <h3 className="font-medium text-foreground text-lg">{title}</h3>
       {description && <p className="mt-2 text-sm">{description}</p>}
     </div>
@@ -103,6 +103,37 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         description="Please wait while the document is being parsed..."
         title={`Processing ${data.filename || "Document"}`}
       />
+    );
+  }
+
+  if (data.status === "cancelling") {
+    return (
+      <TaskLoadingState
+        description="The process is being stopped, please wait..."
+        title={`Cancelling ${data.filename || "Document"}`}
+      />
+    );
+  }
+
+  if (data.status === "cancelled") {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
+        <StateCard
+          action={{
+            label: (
+              <>
+                <Upload />
+                Upload a new file
+              </>
+            ),
+            onClick: () => setActiveTaskId(null),
+          }}
+          className="border-muted/20 bg-muted/5 hover:border-muted/30"
+          description="The processing of this document was stopped by the user."
+          icons={[Ban]}
+          title="Document Processing Cancelled"
+        />
+      </div>
     );
   }
 

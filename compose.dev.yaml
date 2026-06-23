@@ -10,7 +10,7 @@ services:
             - __pycache__/
 
   worker:
-    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --workers 1 --reload --reload-dir apps/backend
+    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --workers 1 --max-async-tasks 1 --reload --reload-dir apps/backend
     develop:
       watch:
         - action: sync
