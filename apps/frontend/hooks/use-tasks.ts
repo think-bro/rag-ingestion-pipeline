@@ -14,7 +14,10 @@ export function useTasks() {
     refetchInterval: (query) => {
       const tasks = query.state.data as TaskResultResponse[] | undefined;
       const hasActiveTasks = tasks?.some(
-        (t) => t.status === "pending" || t.status === "processing"
+        (t) =>
+          t.status === "pending" ||
+          t.status === "processing" ||
+          t.status === "cancelling"
       );
       return hasActiveTasks ? 2000 : 10_000;
     },
@@ -38,7 +41,9 @@ export function useTaskResult(taskId: string | null) {
     refetchInterval: (query) => {
       const task = query.state.data as TaskResultResponse | undefined;
       const isActive =
-        task?.status === "pending" || task?.status === "processing";
+        task?.status === "pending" ||
+        task?.status === "processing" ||
+        task?.status === "cancelling";
       return isActive ? 2000 : false;
     },
   });
@@ -75,6 +80,20 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: (taskId: string) => api.deleteTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to cancel an ongoing parsing task.
+ */
+export function useCancelTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: string) => api.cancelTask(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
     },

@@ -101,6 +101,25 @@ class ParserController(Controller):
         """
         return await parser_service.get_all_tasks()
 
+    @post(path="/tasks/{task_id:str}/cancel", status_code=202)
+    async def cancel_task_endpoint(
+        self,
+        task_id: str,
+        parser_service: ParserService,
+    ) -> TaskResponse:
+        """
+        Cancels an ongoing document parsing task.
+        """
+        success = await parser_service.cancel_task(task_id)
+        if not success:
+            raise ClientException(f"Task {task_id} cannot be cancelled.")
+
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.CANCELLING,
+            message="Task cancellation initiated.",
+        )
+
     @delete(path="/tasks/{task_id:str}", status_code=204)
     async def delete_task_endpoint(
         self,
@@ -110,4 +129,17 @@ class ParserController(Controller):
         """
         Deletes a document parsing task result.
         """
+        result = await parser_service.get_task_result(task_id)
+        if not result:
+            raise NotFoundException(f"Task {task_id} not found")
+
+        if result.status in [
+            TaskStatus.PENDING,
+            TaskStatus.PROCESSING,
+            TaskStatus.CANCELLING,
+        ]:
+            raise ClientException(
+                f"Cannot delete a task in {result.status.value} state."
+            )
+
         await parser_service.delete_task(task_id)
