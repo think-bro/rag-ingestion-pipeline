@@ -29,10 +29,31 @@ export function NewIngestionModal() {
   const isMobile = useIsMobile();
   const [formState, setFormState] = React.useState({
     hasFiles: false,
-    isPending: false,
+    isUploading: false,
+    isSubmitting: false,
   });
 
   const handleClose = () => setNewIngestionModalOpen(false);
+
+  const renderButtonContent = () => {
+    if (formState.isUploading) {
+      return (
+        <>
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Uploading...
+        </>
+      );
+    }
+    if (formState.isSubmitting) {
+      return (
+        <>
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Starting...
+        </>
+      );
+    }
+    return "Start Ingestion";
+  };
 
   if (isMobile) {
     return (
@@ -58,19 +79,16 @@ export function NewIngestionModal() {
           <DrawerFooter className="flex-col sm:flex-row-reverse sm:gap-4">
             <Button
               className="w-full sm:flex-1"
-              disabled={!formState.hasFiles || formState.isPending}
+              disabled={
+                !formState.hasFiles ||
+                formState.isUploading ||
+                formState.isSubmitting
+              }
               form="ingestion-form-mobile"
               size="lg"
               type="submit"
             >
-              {formState.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Starting...
-                </>
-              ) : (
-                "Start Ingestion"
-              )}
+              {renderButtonContent()}
             </Button>
             <DrawerClose asChild>
               <Button className="w-full sm:flex-1" size="lg" variant="outline">
@@ -117,19 +135,16 @@ export function NewIngestionModal() {
           </Button>
           <Button
             className="flex-1"
-            disabled={!formState.hasFiles || formState.isPending}
+            disabled={
+              !formState.hasFiles ||
+              formState.isUploading ||
+              formState.isSubmitting
+            }
             form="ingestion-form-desktop"
             size="lg"
             type="submit"
           >
-            {formState.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Starting...
-              </>
-            ) : (
-              "Start Ingestion"
-            )}
+            {renderButtonContent()}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,7 +1,15 @@
-import { AlertCircle, Ban, Bug, Loader2, Upload } from "lucide-react";
+import {
+  AlertCircle,
+  Ban,
+  Bug,
+  ClockIcon,
+  Loader2,
+  Upload,
+} from "lucide-react";
 import { StateCard } from "@/components/state-card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useTaskResult } from "@/hooks/use-tasks";
+import { formatProcessingTime } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
 function TaskLoadingState({
@@ -50,6 +58,22 @@ function TaskErrorState({
   );
 }
 
+function TaskPendingState({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center p-6 text-muted-foreground">
+      <ClockIcon className="mb-4 h-8 w-8 animate-pulse text-amber-500" />
+      <h3 className="font-medium text-foreground text-lg">{title}</h3>
+      {description && <p className="mt-2 text-sm">{description}</p>}
+    </div>
+  );
+}
+
 export function TaskDetailView({ taskId }: { taskId: string }) {
   const { data, isLoading, isError } = useTaskResult(taskId);
   const { setActiveTaskId } = useTaskStore();
@@ -65,7 +89,15 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       />
     );
   }
-  if (data.status === "pending" || data.status === "processing") {
+  if (data.status === "pending") {
+    return (
+      <TaskPendingState
+        description="Your document is in the queue and will be processed shortly."
+        title={`Waiting for ${data.filename || "Document"}`}
+      />
+    );
+  }
+  if (data.status === "processing") {
     return (
       <TaskLoadingState
         description="Please wait while the document is being parsed..."
@@ -78,6 +110,15 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     <ScrollArea className="w-full flex-1 overflow-y-auto">
       <div className="flex flex-col gap-6 p-6">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          {data.status === "completed" &&
+            typeof data.processing_time === "number" && (
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-muted-foreground text-sm">
+                <ClockIcon className="size-4" />
+                <span>
+                  Processed in {formatProcessingTime(data.processing_time)}
+                </span>
+              </div>
+            )}
           <pre className="whitespace-pre-wrap text-sm">{data.content}</pre>
         </div>
       </div>

@@ -6,7 +6,8 @@ from litestar import Litestar, get, Router
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
 from litestar.di import Provide
-from litestar.plugins.structlog import StructlogPlugin
+from litestar.middleware.logging import LoggingMiddlewareConfig
+from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 
 from apps.backend.app.core.broker import broker
 from apps.backend.app.features.document_parsing.controller import ParserController
@@ -47,9 +48,24 @@ def create_app() -> Litestar:
 
     api_router = Router(path="/api", route_handlers=[ParserController])
 
+    structlog_config = StructlogConfig(
+        middleware_logging_config=LoggingMiddlewareConfig(
+            request_log_fields=(
+                "path",
+                "method",
+                "content_type",
+                "headers",
+                "cookies",
+                "query",
+                "path_params",
+            ),
+            response_log_fields=("status_code", "cookies", "headers"),
+        )
+    )
+
     return Litestar(
         route_handlers=[api_router, health_check],
-        plugins=[StructlogPlugin()],
+        plugins=[StructlogPlugin(config=structlog_config)],
         lifespan=[app_lifespan],
         dependencies={
             "parser_service": Provide(provide_parser_service, sync_to_thread=False)

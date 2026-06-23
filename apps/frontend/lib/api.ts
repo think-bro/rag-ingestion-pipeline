@@ -11,11 +11,22 @@ export interface TaskResultResponse {
   error?: string;
   filename?: string;
   output_format?: string;
+  processing_time?: number;
   status: TaskStatus;
   task_id: string;
 }
 
-const API_BASE = "/api/documents";
+export interface UploadResponse {
+  file_id: string;
+  filename: string;
+  page_count: number | null;
+  size: number;
+}
+
+const API_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://127.0.0.1:8000/api/documents"
+    : "/api/documents";
 
 export const api = {
   /**
@@ -30,18 +41,52 @@ export const api = {
   },
 
   /**
-   * Submits a new document for parsing.
+   * Pre-uploads a document to extract metadata.
    */
-  async submitTask(
-    file: File,
-    format = "markdown"
-  ): Promise<{ task_id: string; status: string; message: string }> {
+  async uploadFile(file: File): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append("data", file);
 
-    const res = await fetch(`${API_BASE}/parse?output_format=${format}`, {
+    const res = await fetch(`${API_BASE}/uploads`, {
       method: "POST",
       body: formData,
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to upload file: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Deletes a pre-uploaded document.
+   */
+  async deleteUpload(fileId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/uploads/${fileId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete upload: ${res.statusText}`);
+    }
+  },
+
+  /**
+   * Submits a pre-uploaded document for parsing.
+   */
+  async submitTask(
+    fileId: string,
+    filename: string,
+    format = "markdown"
+  ): Promise<{ task_id: string; status: string; message: string }> {
+    const res = await fetch(`${API_BASE}/parse`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        file_id: fileId,
+        filename,
+        output_format: format,
+      }),
     });
     if (!res.ok) {
       throw new Error(`Failed to submit task: ${res.statusText}`);
