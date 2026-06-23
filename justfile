@@ -1,18 +1,18 @@
 # --- DOCKER (EXECUTION AND MANAGEMENT) ---
 
-# Spin up the backend, worker, and redis (skips frontend for local dev)
-dev:
-	docker compose up --build
-
-# Spin up the ENTIRE stack including the dockerized frontend
-dev-all:
+# Runs the ENTIRE stack (including frontend) in stable mode, no hot-reload
+run:
 	docker compose --profile frontend up --build
+
+# Runs backend, worker, and redis in watch mode (hot-reload active)
+dev:
+	docker compose -f compose.yaml -f compose.dev.yaml up --build --watch
 
 # Shut down the system and remove containers
 down:
 	docker compose down
 
-# Build the image without starting containers
+# Build the images without starting containers
 build:
 	docker compose build
 
@@ -24,7 +24,7 @@ dev-backend:
 
 # Fallback: Run worker locally without Docker
 dev-worker:
-	uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload
+	uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --workers 1 --reload --reload-dir apps/backend
 
 # Recommended: Run frontend locally with HMR (Hot Module Replacement)
 dev-frontend:
@@ -33,10 +33,6 @@ dev-frontend:
 # Build frontend for production locally (useful for testing builds without Docker)
 build-frontend:
 	pnpm --dir apps/frontend run build
-
-# Start frontend production server locally
-start-frontend:
-	pnpm --dir apps/frontend run start
 
 # Update local dependencies for both backend and frontend
 install:

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown or JSON. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
+Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
 
 ## Tech Stack
 
@@ -71,29 +71,25 @@ compose.yaml                         # Dev environment (backend + worker + redis
 justfile                             # Task runner commands
 ```
 
-## Commands
+## Essential Commands
 
-### Docker (primary)
+**Constraint:** Do not use raw `docker compose` or direct `uv`/`pnpm` run commands for orchestration. Rely entirely on the `just` task runner.
 
-- Dev server (backend + worker + redis): `just dev` or `docker compose up --build`
-- Dev server (full stack incl. frontend): `just dev-all` or `docker compose --profile frontend up --build`
-- Stop: `just down` or `docker compose down`
-- Build only: `just build` or `docker compose build`
+### Execution
 
-### Local (Without Docker)
+- Run Full Stack (Stable): `just run` (Frontend, Backend, Worker, Redis). No watch mode.
+- Run Dev Services (Watch Mode): `just dev` (Backend, Worker, Redis). Instant sync via Docker Compose Watch.
+- Run Frontend Locally (HMR): `just dev-frontend` (Proxies to Backend).
+- Stop System: `just down`
+- Rebuild Images: `just build`
 
-- Install all dependencies: `just install` or `uv sync && pnpm --dir apps/frontend install`
-- Dev server (backend): `just dev-backend` or `uv run --package backend litestar --app apps.backend.app.main:app run --debug --reload`
-- Dev server (worker): `just dev-worker` or `uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload`
-- Dev server (frontend): `just dev-frontend` or `cd apps/frontend && pnpm dev`
-- Build frontend for production: `just build-frontend` or `pnpm --dir apps/frontend run build`
+### Development & Tooling
 
-### Code quality (always local)
-
-- Lint: `just lint` or `uv run ruff check . && pnpm --dir apps/frontend run check`
-- Format: `just format` or `uv run ruff format . && pnpm --dir apps/frontend run fix`
-- Type check: `just typecheck` or `uv run ty check && pnpm --dir apps/frontend run typecheck`
-- Run all checks: `just check`
+- Install Dependencies: `just install`
+- Run All Checks: `just check` (Runs lint, format, and typecheck sequentially).
+- Format Code: `just format`
+- Lint Code: `just lint`
+- Type Check: `just typecheck`
 
 Always run `just check` before finalizing any work.
 
@@ -109,6 +105,7 @@ Always run `just check` before finalizing any work.
 - Use absolute imports for cross-feature or core references (e.g., `from apps.backend.app.core.config import UPLOAD_DIR`).
 - **Imports must always be at the top level of the file.** Never use inline (local) imports inside functions or classes unless absolutely necessary to break a circular dependency. This ensures dependencies are visible, avoids runtime `ImportError`s, and aligns with Python best practices.
 - **Prefer explicit imports** for submodules and functions (e.g., `from anyio import to_thread`) rather than top-level module access (`import anyio`). This ensures correct resolution by strict type checkers like Pyright (`ty`).
+- **Do not use redundant `typing.cast`**. Trust the inferred types of Litestar's `app.state` objects (which are `Any`). Excessive defensive casting of `Any` to `Any` causes `redundant-cast` warnings in `ruff` and is strictly prohibited.
 - All comments, docstrings, and commit messages must be in English.
 
 ### Frontend (TypeScript)
@@ -258,11 +255,11 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
 1. **Upload Phase**: `POST /uploads` endpoint accepts a multipart file, saves it to `/storage/uploads/`, calculates metadata (e.g., page count), and returns `file_id`.
-2. **Parse Phase**: `POST /parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to disk, and returns HTTP 202 with a `task_id`.
+2. **Parse Phase**: `POST /parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to a Redis Hash (`task:{task_id}`), and returns HTTP 202 with a `task_id`.
 3. The actual processing is executed by a separate `worker` process via TaskIQ. This prevents blocking the main web server process.
 4. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `anyio.to_thread.run_sync()` within the worker task to avoid blocking the worker's event loop.
-5. The worker writes task state transitions to disk as JSON files (`/storage/results/{task_id}.json`). This is the source of truth for task results.
-6. A `GET /tasks/{task_id}` endpoint reads the task result directly from disk. A `GET /tasks` endpoint lists all tasks. A `DELETE /tasks/{task_id}` endpoint removes a task result.
+5. The worker writes task state transitions (metadata) to Redis Hashes (`task:{task_id}`). This is the source of truth for task status. The large parsed content is written to disk as `.md` files (`/storage/results/{task_id}.md`) to save Redis memory.
+6. A `GET /tasks/{task_id}` endpoint reads the task metadata from Redis and content from disk. A `GET /tasks` endpoint lists all tasks from Redis using a pipeline. A `DELETE /tasks/{task_id}` endpoint removes the Redis Hash and the `.md` file.
 7. The frontend uses **adaptive polling** (2s when tasks are active, 10s when idle) via TanStack Query's `refetchInterval`.
 8. Only minimal metadata is returned to Redis (`RedisAsyncResultBackend`) to keep the Redis memory footprint low. Full parsed content stays on disk.
 9. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
@@ -277,16 +274,17 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 
 Heavy resources like `DocumentConverter` (which loads ML models) are initialized once in `app_lifespan` and stored on `app.state`. Services that depend on these resources are also created once and injected via Litestar's DI system (`Provide`).
 
-## Docker
+## Docker Architecture
 
-- The backend and worker run inside Docker for development. `compose.yaml` mounts the local code for hot-reload.
-- The frontend container is behind a `frontend` Docker Compose profile. Use `just dev-all` to include it, or run the frontend locally with `just dev-frontend` for faster iteration.
+- The base `compose.yaml` defines the stable production-like environment.
+- The `compose.dev.yaml` acts as an override file for development. It uses `develop.watch` (Docker Compose Watch) to sync files from the host to the container instantly. It does **not** use bind mounts for code directories to preserve cross-platform I/O performance.
+- The frontend container is behind a `frontend` Docker Compose profile. Use `just run` to include it, or run the frontend locally with `just dev-frontend` for faster iteration during active development.
 - In production, the frontend is built as a static export and served by Nginx. Nginx also reverse-proxies `/api/` requests to the backend container.
 - ML model weights are persisted in named Docker volumes (`hf-models-cache`, `rapidocr-models-cache`) to avoid re-downloading on container restarts.
 - Task results and uploads are persisted in a `shared-storage` Docker volume mounted at `/workspace/storage`, shared between the backend and worker containers.
 - The backend Dockerfile uses a multi-stage build: a `builder` stage installs dependencies via `uv`, the runtime stage copies only the venv.
 - The frontend Dockerfile uses a three-stage build: dependencies → Next.js build → Nginx static serving.
-- Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume and permission setup.
+- Do not modify `Dockerfile`s or `compose.yaml` without understanding the volume, network, and permission setup.
 
 ## Git Conventions & Release Automation
 

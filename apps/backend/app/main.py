@@ -10,8 +10,10 @@ from litestar.middleware.logging import LoggingMiddlewareConfig
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 
 from apps.backend.app.core.broker import broker
+from apps.backend.app.core.redis_client import get_redis_pool
 from apps.backend.app.features.document_parsing.controller import ParserController
 from apps.backend.app.features.document_parsing.service import ParserService
+import redis.asyncio as aioredis
 
 
 @get("/health")
@@ -26,12 +28,23 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     if not broker.is_worker_process:
         await broker.startup()
 
+    app.state.redis_pool = await get_redis_pool()
+
+    app.state.redis = aioredis.Redis(connection_pool=app.state.redis_pool)
+
     app.state.converter = DocumentConverter()
-    app.state.parser_service = ParserService(converter=app.state.converter)
+    app.state.parser_service = ParserService(
+        converter=app.state.converter,
+        redis=app.state.redis,
+    )
     yield
 
     del app.state.converter
     del app.state.parser_service
+
+    await app.state.redis_pool.disconnect()
+    del app.state.redis
+    del app.state.redis_pool
 
     if not broker.is_worker_process:
         await broker.shutdown()

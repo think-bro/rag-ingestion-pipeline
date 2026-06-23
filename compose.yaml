@@ -17,6 +17,7 @@ services:
       retries: 5
 
   backend:
+    image: rag-ingestion-pipeline-backend:latest
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
@@ -25,10 +26,8 @@ services:
     environment:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
-    command: litestar --app apps.backend.app.main:app run --host 0.0.0.0 --port 8000 --debug --reload --reload-dir apps/backend
+    command: litestar --app apps.backend.app.main:app run --host 0.0.0.0 --port 8000
     volumes:
-      - .:/workspace
-      - /workspace/.venv
       - hf-models-cache:/workspace/models/hf
       - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
       - shared-storage:/workspace/storage
@@ -51,22 +50,21 @@ services:
       retries: 3
 
   worker:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    image: rag-ingestion-pipeline-backend:latest
     environment:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
-    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --reload --reload-dir apps/backend
+      - OMP_NUM_THREADS=3
+    command: taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.document_parsing.tasks --workers 2
     volumes:
-      - .:/workspace
-      - /workspace/.venv
       - hf-models-cache:/workspace/models/hf
       - rapidocr-models-cache:/workspace/.venv/lib/python3.14/site-packages/rapidocr/models
       - shared-storage:/workspace/storage
     working_dir: /workspace
     restart: unless-stopped
     depends_on:
+      backend:
+        condition: service_started
       redis:
         condition: service_healthy
 
