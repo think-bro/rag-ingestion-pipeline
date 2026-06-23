@@ -17,12 +17,23 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 sequenceDiagram
     participant F as Frontend (Next.js)
     participant B as Backend (Litestar)
-    participant R as Redis (TaskIQ)
-    participant W as Worker
+    participant R as Redis (Broker/Queue)
+    participant W as TaskIQ Worker
     participant D as Disk (/storage)
 
-    F->>B: POST /api/documents/parse (multipart file upload)
+    Note over F,B: Phase 1: Pre-upload (Instant)
+    F->>B: POST /api/documents/uploads (multipart file upload)
     B->>D: Save file to disk (/storage/uploads/{uuid}.ext)
+    B->>B: Extract page count via pypdfium2
+    B->>F: 201 Created {file_id: "uuid.ext", page_count: 14}
+    
+    opt If user cancels the process (Trash Icon or Modal Close)
+        F->>B: DELETE /api/documents/uploads/{file_id}
+        B->>D: Delete file from disk
+    end
+
+    Note over F,B: Phase 2: Start Ingestion
+    F->>B: POST /api/documents/parse {file_id: "uuid.ext", output_format: "markdown"}
     B->>D: Write initial task state (pending)
     B->>R: Enqueue task (task_id, file_path, options)
     B->>F: 202 Accepted {task_id: "abc-123"}
@@ -30,16 +41,18 @@ sequenceDiagram
     loop Every 2 seconds (adaptive polling)
         F->>B: GET /api/documents/tasks/abc-123
         B->>D: Read task result from disk
-        B->>F: {status: "processing"} or {status: "completed", content: "..."}
+        B->>F: {status: "processing"} or {status: "completed"}
     end
 
+    Note over W,D: Background Processing
     W->>R: Dequeue task
-    W->>D: Update task state (processing)
     W->>D: Read uploaded file from disk
     W->>W: Parse with Docling (in thread pool)
-    W->>D: Write final result to disk (completed/failed)
-    W->>D: Delete original uploaded file
-    W->>R: Return minimal metadata to Redis (TTL: 1 hour)
+    W->>D: Delete original uploaded file (file_id)
+    W->>D: Write final result to disk
+    
+    Note over W,D: Cron Job (Hourly)
+    W->>D: Clean up orphaned files older than 24h
 ```
 
 ## Tech Stack

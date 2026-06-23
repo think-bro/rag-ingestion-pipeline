@@ -51,8 +51,15 @@ export function useSubmitTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ file, format }: { file: File; format?: string }) =>
-      api.submitTask(file, format),
+    mutationFn: ({
+      fileId,
+      filename,
+      format,
+    }: {
+      fileId: string;
+      filename: string;
+      format?: string;
+    }) => api.submitTask(fileId, filename, format),
     onSuccess: () => {
       // Invalidate the tasks query so it immediately refetches the new list
       queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });

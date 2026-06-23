@@ -2,16 +2,17 @@ import structlog
 from litestar import Controller, delete, get, post
 from litestar.datastructures import UploadFile
 from litestar.enums import RequestEncodingType
-from litestar.exceptions import NotFoundException
+from litestar.exceptions import NotFoundException, ClientException
 from litestar.params import Body
 from typing import Annotated
 
 from .schemas import (
-    OutputFormat,
     TaskResponse,
     TaskResultResponse,
     TaskStatus,
     TaskListDTO,
+    UploadResponse,
+    ParseRequest,
 )
 from .service import ParserService
 
@@ -21,28 +22,53 @@ logger = structlog.get_logger()
 class ParserController(Controller):
     path = "/documents"
 
-    @post(path="/parse", status_code=202)
-    async def parse_document_endpoint(
+    @post(path="/uploads", status_code=201)
+    async def upload_document_endpoint(
         self,
         data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
         parser_service: ParserService,
-        output_format: OutputFormat = OutputFormat.MARKDOWN,
+    ) -> UploadResponse:
+        """
+        Pre-uploads a document and extracts metadata (like page count).
+        """
+        logger.info(
+            "received_upload_request",
+            filename=data.filename,
+            content_type=data.content_type,
+        )
+        return await parser_service.upload_file(data)
+
+    @delete(path="/uploads/{file_id:str}", status_code=204)
+    async def delete_upload_endpoint(
+        self,
+        file_id: str,
+        parser_service: ParserService,
+    ) -> None:
+        """
+        Deletes a pre-uploaded document.
+        """
+        await parser_service.delete_upload(file_id)
+
+    @post(path="/parse", status_code=202)
+    async def parse_document_endpoint(
+        self,
+        data: ParseRequest,
+        parser_service: ParserService,
     ) -> TaskResponse:
         """
-        Receives an uploaded file via multipart form and starts a background task
-        to process it. Returns a task ID immediately.
+        Starts a background task to process a pre-uploaded file.
         """
         logger.info(
             "received_parse_request",
+            file_id=data.file_id,
             filename=data.filename,
-            content_type=data.content_type,
-            output_format=output_format,
+            output_format=data.output_format,
         )
 
-        task_id = await parser_service.save_and_submit_task(
-            upload_file=data,
-            output_format=output_format,
-        )
+        try:
+            task_id = await parser_service.save_and_submit_task(parse_request=data)
+        except ValueError as e:
+            raise ClientException(str(e))
 
         return TaskResponse(
             task_id=task_id,

@@ -114,7 +114,11 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            disabled={isDeleting || task.status === "pending" || task.status === "processing"}
+            disabled={
+              isDeleting ||
+              task.status === "pending" ||
+              task.status === "processing"
+            }
             onClick={async (e) => {
               e.stopPropagation();
               await deleteTask(task.task_id);
