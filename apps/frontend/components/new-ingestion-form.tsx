@@ -6,15 +6,7 @@ import { useDropzone } from "react-dropzone";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { useSubmitTask } from "@/hooks/use-tasks";
 import { api, type UploadResponse } from "@/lib/api";
 import { cn, formatBytes } from "@/lib/utils";
@@ -44,7 +36,7 @@ export function NewIngestionForm({
   const [items, setItems] = React.useState<UploadItem[]>([]);
   const { setNewIngestionModalOpen, setActiveTaskId } = useTaskStore();
   const { mutateAsync, isPending } = useSubmitTask();
-  const [format, setFormat] = React.useState("markdown");
+  const format = "markdown"; // TODO: Use state when multiple output formats are supported
 
   const itemsRef = React.useRef(items);
   itemsRef.current = items;
@@ -218,60 +210,7 @@ export function NewIngestionForm({
   return (
     <form id={id} onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-        <div className="col-span-full sm:col-span-3">
-          <Label className="font-medium" htmlFor="task-type">
-            Task
-          </Label>
-          <Select defaultValue="parsing">
-            <SelectTrigger
-              className="mt-2 w-full"
-              id="task-type"
-              name="task-type"
-            >
-              <SelectValue placeholder="Select task" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Tasks</SelectLabel>
-                <SelectItem value="parsing">Parsing</SelectItem>
-                <SelectItem disabled value="chunking">
-                  Chunking (not yet implemented)
-                </SelectItem>
-                <SelectItem disabled value="embedding">
-                  Embedding (not yet implemented)
-                </SelectItem>
-                <SelectItem disabled value="vector">
-                  Vector Storage (not yet implemented)
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="col-span-full sm:col-span-3">
-          <Label className="font-medium" htmlFor="output-format">
-            Output format
-          </Label>
-          <Select
-            disabled={isFormPending}
-            onValueChange={setFormat}
-            value={format}
-          >
-            <SelectTrigger
-              className="mt-2 w-full"
-              id="output-format"
-              name="output-format"
-            >
-              <SelectValue placeholder="Select output format" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Formats</SelectLabel>
-                <SelectItem value="markdown">Markdown</SelectItem>
-                <SelectItem value="json">JSON</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* TODO: Add back task type and output format selects when they are implemented */}
         <div className="col-span-full">
           <Label className="font-medium" htmlFor="file-upload-2">
             File(s) upload

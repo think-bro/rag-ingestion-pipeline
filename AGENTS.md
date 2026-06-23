@@ -250,16 +250,23 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 - Never create top-level directories like `controllers/`, `models/`, or `services/`. That is layer-based architecture.
 - Use Pydantic `BaseModel` for all request/response schemas. Define them in `schemas.py` within each feature module.
 
+### API Versioning
+
+The backend API uses URL path versioning (e.g., `/api/v1/`).
+- Only major versions are represented in the URL.
+- The `v1` prefix applies to all resources under `/api/`.
+- The `/health` endpoint is not versioned.
+
 ### Async Task Pattern
 
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
-1. **Upload Phase**: `POST /uploads` endpoint accepts a multipart file, saves it to `/storage/uploads/`, calculates metadata (e.g., page count), and returns `file_id`.
-2. **Parse Phase**: `POST /parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to a Redis Hash (`task:{task_id}`), and returns HTTP 202 with a `task_id`.
+1. **Upload Phase**: `POST /api/v1/documents/uploads` endpoint accepts a multipart file, saves it to `/storage/uploads/`, calculates metadata (e.g., page count), and returns `file_id`.
+2. **Parse Phase**: `POST /api/v1/documents/parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to a Redis Hash (`task:{task_id}`), and returns HTTP 202 with a `task_id`.
 3. The actual processing is executed by a separate `worker` process via TaskIQ. This prevents blocking the main web server process.
 4. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `anyio.to_thread.run_sync()` within the worker task to avoid blocking the worker's event loop.
 5. The worker writes task state transitions (metadata) to Redis Hashes (`task:{task_id}`). This is the source of truth for task status. The large parsed content is written to disk as `.md` files (`/storage/results/{task_id}.md`) to save Redis memory.
-6. A `GET /tasks/{task_id}` endpoint reads the task metadata from Redis and content from disk. A `GET /tasks` endpoint lists all tasks from Redis using a pipeline. A `DELETE /tasks/{task_id}` endpoint removes the Redis Hash and the `.md` file.
+6. A `GET /api/v1/documents/tasks/{task_id}` endpoint reads the task metadata from Redis and content from disk. A `GET /api/v1/documents/tasks` endpoint lists all tasks from Redis using a pipeline. A `DELETE /api/v1/documents/tasks/{task_id}` endpoint removes the Redis Hash and the `.md` file.
 7. The frontend uses **adaptive polling** (2s when tasks are active, 10s when idle) via TanStack Query's `refetchInterval`.
 8. Only minimal metadata is returned to Redis (`RedisAsyncResultBackend`) to keep the Redis memory footprint low. Full parsed content stays on disk.
 9. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.
