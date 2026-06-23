@@ -34,14 +34,15 @@ sequenceDiagram
 
     Note over F,B: Phase 2: Start Ingestion
     F->>B: POST /api/documents/parse {file_id: "uuid.ext", output_format: "markdown"}
-    B->>D: Write initial task state (pending)
+    B->>R: Write initial task state (pending) to Redis Hash
     B->>R: Enqueue task (task_id, file_path, options)
     B->>F: 202 Accepted {task_id: "abc-123"}
 
     loop Every 2 seconds (adaptive polling)
         F->>B: GET /api/documents/tasks/abc-123
-        B->>D: Read task result from disk
-        B->>F: {status: "processing"} or {status: "completed"}
+        B->>R: Read task metadata/status from Redis Hash
+        B->>D: Read content from disk ONLY IF completed
+        B->>F: {status: "processing"} or {status: "completed", content: "..."}
     end
 
     Note over W,D: Background Processing
@@ -49,7 +50,8 @@ sequenceDiagram
     W->>D: Read uploaded file from disk
     W->>W: Parse with Docling (in thread pool)
     W->>D: Delete original uploaded file (file_id)
-    W->>D: Write final result to disk
+    W->>D: Write final parsed content to disk (.md)
+    W->>R: Update task state to completed in Redis Hash
     
     Note over W,D: Cron Job (Hourly)
     W->>D: Clean up orphaned files older than 24h

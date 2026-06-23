@@ -12,4 +12,5 @@ dependencies = [
     "taskiq-redis>=1.2.2",
     "torch",
     "torchvision",
+    "redis[hiredis]>=7.4.1",
 ]

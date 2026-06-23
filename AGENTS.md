@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown or JSON. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
+Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
 
 ## Tech Stack
 
@@ -105,6 +105,7 @@ Always run `just check` before finalizing any work.
 - Use absolute imports for cross-feature or core references (e.g., `from apps.backend.app.core.config import UPLOAD_DIR`).
 - **Imports must always be at the top level of the file.** Never use inline (local) imports inside functions or classes unless absolutely necessary to break a circular dependency. This ensures dependencies are visible, avoids runtime `ImportError`s, and aligns with Python best practices.
 - **Prefer explicit imports** for submodules and functions (e.g., `from anyio import to_thread`) rather than top-level module access (`import anyio`). This ensures correct resolution by strict type checkers like Pyright (`ty`).
+- **Do not use redundant `typing.cast`**. Trust the inferred types of Litestar's `app.state` objects (which are `Any`). Excessive defensive casting of `Any` to `Any` causes `redundant-cast` warnings in `ruff` and is strictly prohibited.
 - All comments, docstrings, and commit messages must be in English.
 
 ### Frontend (TypeScript)
@@ -254,11 +255,11 @@ The backend uses **feature-based architecture**. Each feature is a self-containe
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
 1. **Upload Phase**: `POST /uploads` endpoint accepts a multipart file, saves it to `/storage/uploads/`, calculates metadata (e.g., page count), and returns `file_id`.
-2. **Parse Phase**: `POST /parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to disk, and returns HTTP 202 with a `task_id`.
+2. **Parse Phase**: `POST /parse` endpoint receives the `file_id` and options, kicks off a TaskIQ background task (`parse_document_task.kiq()`), writes an initial "pending" state to a Redis Hash (`task:{task_id}`), and returns HTTP 202 with a `task_id`.
 3. The actual processing is executed by a separate `worker` process via TaskIQ. This prevents blocking the main web server process.
 4. CPU-intensive work (e.g., `DocumentConverter.convert()`) is offloaded to a thread pool via `anyio.to_thread.run_sync()` within the worker task to avoid blocking the worker's event loop.
-5. The worker writes task state transitions to disk as JSON files (`/storage/results/{task_id}.json`). This is the source of truth for task results.
-6. A `GET /tasks/{task_id}` endpoint reads the task result directly from disk. A `GET /tasks` endpoint lists all tasks. A `DELETE /tasks/{task_id}` endpoint removes a task result.
+5. The worker writes task state transitions (metadata) to Redis Hashes (`task:{task_id}`). This is the source of truth for task status. The large parsed content is written to disk as `.md` files (`/storage/results/{task_id}.md`) to save Redis memory.
+6. A `GET /tasks/{task_id}` endpoint reads the task metadata from Redis and content from disk. A `GET /tasks` endpoint lists all tasks from Redis using a pipeline. A `DELETE /tasks/{task_id}` endpoint removes the Redis Hash and the `.md` file.
 7. The frontend uses **adaptive polling** (2s when tasks are active, 10s when idle) via TanStack Query's `refetchInterval`.
 8. Only minimal metadata is returned to Redis (`RedisAsyncResultBackend`) to keep the Redis memory footprint low. Full parsed content stays on disk.
 9. The `RedisStreamBroker` guarantees at-least-once delivery, so tasks aren't lost if a worker crashes.

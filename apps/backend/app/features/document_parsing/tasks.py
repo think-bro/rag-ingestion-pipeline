@@ -28,11 +28,12 @@ async def parse_document_task(
     TaskIQ task: Parses the document from disk and writes the final JSON to disk.
     """
     converter = state.converter
+    redis = state.redis
     task_id = context.message.task_id
 
     logger.info("started_parse_task", task_id=task_id, filename=filename)
 
-    # Write 'processing' state to disk immediately
+    # Write 'processing' state to Redis immediately
     processing_data = {
         "task_id": task_id,
         "status": "processing",
@@ -40,9 +41,7 @@ async def parse_document_task(
         "output_format": output_format,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    result_path = RESULTS_DIR / f"{task_id}.json"
-    async with await open_file(result_path, "w") as f:
-        await f.write(json.dumps(processing_data, indent=2))
+    await redis.hset(f"task:{task_id}", mapping=processing_data)
 
     start_time = time.perf_counter()
 
@@ -68,12 +67,11 @@ async def parse_document_task(
             processing_time=processing_time,
         )
 
-        output_data = {
+        output_metadata = {
             "task_id": task_id,
             "status": "completed",
             "filename": filename,
             "output_format": output_format,
-            "content": parsed_content,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "processing_time": processing_time,
         }
@@ -87,7 +85,7 @@ async def parse_document_task(
             error=str(e),
             processing_time=processing_time,
         )
-        output_data = {
+        output_metadata = {
             "task_id": task_id,
             "status": "failed",
             "filename": filename,
@@ -100,15 +98,19 @@ async def parse_document_task(
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
-    # Write to disk asynchronously
-    result_path = RESULTS_DIR / f"{task_id}.json"
-    async with await open_file(result_path, "w") as f:
-        await f.write(json.dumps(output_data, indent=2))
+    # Write content to disk asynchronously ONLY IF completed
+    result_path = RESULTS_DIR / f"{task_id}.md"
+    if output_metadata["status"] == "completed":
+        async with await open_file(result_path, "w", encoding="utf-8") as f:
+            await f.write(parsed_content)
 
-    # Return minimal data to Redis (Best Practice for large payloads)
+    # Write metadata to Redis
+    await redis.hset(f"task:{task_id}", mapping=output_metadata)
+
+    # Return minimal data to Redis Result Backend
     return {
         "task_id": task_id,
-        "status": output_data["status"],
+        "status": output_metadata["status"],
         "result_uri": str(result_path),
     }
 

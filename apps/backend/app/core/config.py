@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
 WORKSPACE_DIR = os.getenv("WORKSPACE_DIR")
 BASE_DIR = Path(WORKSPACE_DIR) if WORKSPACE_DIR else Path.cwd()
 STORAGE_DIR = BASE_DIR / "storage"
