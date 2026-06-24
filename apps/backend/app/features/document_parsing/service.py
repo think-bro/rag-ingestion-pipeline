@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
@@ -12,13 +13,24 @@ from litestar.datastructures import UploadFile
 from apps.backend.app.core.config import (
     RESULTS_DIR,
     UPLOAD_DIR,
+    PARTS_DIR,
     CANCEL_KEY_PREFIX,
     CANCEL_KEY_TTL,
+    PAGES_PER_PART,
 )
-from .schemas import TaskResultResponse, TaskStatus, UploadResponse, ParseRequest
-from .tasks import parse_document_task
+from .schemas import (
+    TaskResultResponse,
+    TaskStatus,
+    UploadResponse,
+    ParseRequest,
+    PartStatus,
+    PartResponse,
+)
+from .tasks import parse_part_task
 
 logger = structlog.get_logger()
+
+_pdf_split_lock = asyncio.Lock()
 
 
 class ParserService:
@@ -78,8 +90,47 @@ class ParserService:
                 "failed_to_delete_uploaded_file", file_id=file_id, error=str(e)
             )
 
+    async def _split_pdf(self, file_path: Path, task_id: str) -> tuple[int, list[dict]]:
+        """Splits a PDF into multiple parts physically and returns (total_pages, parts metadata)."""
+
+        def split_sync(path: str, t_id: str) -> tuple[int, list[dict]]:
+            parts = []
+            pdf = pdfium.PdfDocument(path)
+            total_pages = len(pdf)
+
+            for start_idx in range(0, total_pages, PAGES_PER_PART):
+                end_idx = min(start_idx + PAGES_PER_PART, total_pages)
+                part_index = start_idx // PAGES_PER_PART
+
+                new_pdf = pdfium.PdfDocument.new()
+                # page indices are 0-based
+                pages_to_import = list(range(start_idx, end_idx))
+                new_pdf.import_pages(pdf, pages=pages_to_import)
+
+                out_path = PARTS_DIR / f"{t_id}_part_{part_index:03d}.pdf"
+                new_pdf.save(str(out_path))
+                new_pdf.close()
+
+                parts.append(
+                    {
+                        "part_index": part_index,
+                        "page_start": start_idx + 1,
+                        "page_end": end_idx,
+                        "file_path": str(out_path),
+                    }
+                )
+            pdf.close()
+            return total_pages, parts
+
+        async with _pdf_split_lock:
+            try:
+                return await to_thread.run_sync(split_sync, str(file_path), task_id)
+            except Exception as e:
+                logger.error("pdf_split_failed", task_id=task_id, error=str(e))
+                raise ValueError(f"Failed to split PDF: {e}")
+
     async def save_and_submit_task(self, parse_request: ParseRequest) -> str:
-        """Submits the task using an already uploaded file."""
+        """Splits the file and submits parsing tasks for each part."""
         file_id = parse_request.file_id
 
         if ".." in file_id or "/" in file_id or "\\" in file_id:
@@ -91,71 +142,131 @@ class ParserService:
         if not await path_obj.exists():
             raise ValueError(f"File {file_id} not found in uploads directory.")
 
-        result = await parse_document_task.kiq(
-            filename=parse_request.filename,
-            file_path=str(file_path),
-            output_format=parse_request.output_format.value,
-        )
-        task_id = result.task_id
+        task_id = uuid.uuid4().hex
 
-        # Write initial 'pending' state to Redis
+        # Get metadata
+        stat = await path_obj.stat()
+        file_size = stat.st_size
+
+        try:
+            # TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
+            page_count, parts_info = await self._split_pdf(path_obj, task_id)
+            total_parts = len(parts_info)
+        except Exception as e:
+            # Write failed master state to Redis if splitting fails
+            failed_data = {
+                "task_id": task_id,
+                "status": TaskStatus.FAILED.value,
+                "error": str(e),
+                "filename": parse_request.filename,
+                "output_format": parse_request.output_format.value,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "file_size": file_size,
+                "page_count": 0,
+                "total_parts": 0,
+                "completed_parts": 0,
+            }
+            await self.redis.hset(f"task:{task_id}", mapping=failed_data)
+            await path_obj.unlink(missing_ok=True)
+            return task_id
+
+        # Write initial master state to Redis
         pending_data = {
             "task_id": task_id,
             "status": TaskStatus.PENDING.value,
             "filename": parse_request.filename,
             "output_format": parse_request.output_format.value,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "file_size": file_size,
+            "page_count": page_count if page_count is not None else 0,
+            "total_parts": total_parts,
+            "completed_parts": 0,
         }
         await self.redis.hset(f"task:{task_id}", mapping=pending_data)
 
+        # Dispatch tasks and write part hashes
+        for p in parts_info:
+            part_idx = p["part_index"]
+            part_data = {
+                "part_index": part_idx,
+                "page_start": p["page_start"],
+                "page_end": p["page_end"],
+                "status": PartStatus.WAITING.value,
+            }
+            await self.redis.hset(f"task:{task_id}:part:{part_idx}", mapping=part_data)
+
+            await parse_part_task.kiq(
+                task_id=task_id,
+                part_index=part_idx,
+                part_file_path=p["file_path"],
+                page_start=p["page_start"],
+                page_end=p["page_end"],
+                filename=parse_request.filename,
+                output_format=parse_request.output_format.value,
+            )
+
         logger.info(
-            "submitted_parse_task", task_id=task_id, filename=parse_request.filename
+            "submitted_parse_task_with_parts",
+            task_id=task_id,
+            filename=parse_request.filename,
+            total_parts=total_parts,
         )
+
+        # We can safely remove the original uploaded file to save space
+        await path_obj.unlink(missing_ok=True)
+
         return task_id
 
     async def get_task_result(self, task_id: str) -> TaskResultResponse | None:
-        """Fetches the task result from Redis (metadata) and disk (content)."""
+        """Fetches the master task result and its parts from Redis."""
         task_data = await self.redis.hgetall(f"task:{task_id}")
 
         if not task_data:
-            return TaskResultResponse(
-                task_id=task_id,
-                status=TaskStatus.FAILED,
-                error="Result not found in Redis.",
-            )
+            return None
 
-        # Convert float processing time if exists
-        if "processing_time" in task_data:
-            task_data["processing_time"] = float(task_data["processing_time"])
+        # Convert numerics
+        for key in ["processing_time"]:
+            if key in task_data:
+                task_data[key] = float(task_data[key])
+        for key in ["page_count", "file_size", "total_parts", "completed_parts"]:
+            if key in task_data:
+                task_data[key] = int(task_data[key])
+
+        # Fetch parts
+        parts = []
+        total_parts = task_data.get("total_parts", 0)
+
+        if total_parts > 0:
+            pipe = self.redis.pipeline()
+            for i in range(total_parts):
+                pipe.hgetall(f"task:{task_id}:part:{i}")
+
+            part_results = await pipe.execute()
+            for p in part_results:
+                if not p:
+                    continue
+                p["part_index"] = int(p["part_index"])
+                p["page_start"] = int(p["page_start"])
+                p["page_end"] = int(p["page_end"])
+                if "processing_time" in p:
+                    p["processing_time"] = float(p["processing_time"])
+                parts.append(PartResponse(**p))
 
         response = TaskResultResponse(**task_data)
-
-        # Load content from disk if completed
-        if response.status == TaskStatus.COMPLETED:
-            content_path = RESULTS_DIR / f"{task_id}.md"
-            path_obj = Path(content_path)
-            if await path_obj.exists():
-                try:
-                    async with await open_file(
-                        content_path, "r", encoding="utf-8"
-                    ) as f:
-                        response.content = await f.read()
-                except Exception as e:
-                    logger.error(
-                        "failed_to_read_content_md", task_id=task_id, error=str(e)
-                    )
-                    response.error = f"Content read error: {e}"
-
+        response.parts = parts
         return response
 
     async def get_all_tasks(self) -> list[TaskResultResponse]:
         """Lists all tasks from Redis."""
         keys = await self.redis.keys("task:*")
-        if not keys:
+        # Filter out part keys and set keys
+        master_keys = [k for k in keys if ":part:" not in k and "_set" not in k]
+
+        if not master_keys:
             return []
 
         pipe = self.redis.pipeline()
-        for key in keys:
+        for key in master_keys:
             pipe.hgetall(key)
 
         results = await pipe.execute()
@@ -166,6 +277,9 @@ class ParserService:
                 continue
             if "processing_time" in data:
                 data["processing_time"] = float(data["processing_time"])
+            for key in ["page_count", "file_size", "total_parts", "completed_parts"]:
+                if key in data:
+                    data[key] = int(data[key])
             tasks.append(TaskResultResponse(**data))
 
         # Sort tasks by created_at descending (newest first)
@@ -180,11 +294,25 @@ class ParserService:
         return tasks
 
     async def delete_task(self, task_id: str) -> None:
-        """Deletes a task result from Redis and disk."""
+        """Deletes a task result from Redis and disk (all parts)."""
         try:
+            # Delete master hash and sets
             await self.redis.delete(f"task:{task_id}")
-            content_path = Path(RESULTS_DIR / f"{task_id}.md")
-            await content_path.unlink(missing_ok=True)
+            await self.redis.delete(f"task:{task_id}:completed_set")
+            await self.redis.delete(f"task:{task_id}:failed_set")
+            await self.redis.delete(f"task:{task_id}:cancelled_set")
+
+            # Delete part hashes and files
+            keys = await self.redis.keys(f"task:{task_id}:part:*")
+            if keys:
+                await self.redis.delete(*keys)
+
+            # Clean up disk files (.md, .pdf, and merged files)
+            for file_path in RESULTS_DIR.glob(f"{task_id}_part_*.md"):
+                await Path(file_path).unlink(missing_ok=True)
+            await Path(RESULTS_DIR / f"{task_id}_merged.md").unlink(missing_ok=True)
+            for file_path in PARTS_DIR.glob(f"{task_id}_part_*.pdf"):
+                await Path(file_path).unlink(missing_ok=True)
 
             logger.info("deleted_task_result", task_id=task_id)
         except Exception as e:
@@ -213,3 +341,77 @@ class ParserService:
 
         logger.info("initiated_task_cancellation", task_id=task_id)
         return True
+
+    async def retry_part(self, task_id: str, part_index: int) -> bool:
+        """Retries a failed part."""
+        task_data = await self.redis.hgetall(f"task:{task_id}")
+        part_data = await self.redis.hgetall(f"task:{task_id}:part:{part_index}")
+
+        if not task_data or not part_data:
+            return False
+
+        if part_data.get("status") != PartStatus.FAILED.value:
+            return False
+
+        # Check if PDF part exists
+        out_path = PARTS_DIR / f"{task_id}_part_{part_index:03d}.pdf"
+        if not await Path(out_path).exists():
+            return False
+
+        # Reset part status and remove from failed_set
+        await self.redis.hset(
+            f"task:{task_id}:part:{part_index}", "status", PartStatus.WAITING.value
+        )
+        await self.redis.srem(f"task:{task_id}:failed_set", part_index)
+
+        # If master is completed/failed, set back to processing
+        if task_data.get("status") in [
+            TaskStatus.COMPLETED.value,
+            TaskStatus.FAILED.value,
+        ]:
+            await self.redis.hset(
+                f"task:{task_id}", "status", TaskStatus.PROCESSING.value
+            )
+
+        # Re-queue
+        await parse_part_task.kiq(
+            task_id=task_id,
+            part_index=part_index,
+            part_file_path=str(out_path),
+            page_start=int(part_data.get("page_start", 0)),
+            page_end=int(part_data.get("page_end", 0)),
+            filename=task_data.get("filename", ""),
+            output_format=task_data.get("output_format", "markdown"),
+        )
+        return True
+
+    async def download_part_content(self, task_id: str, part_index: int) -> Path | None:
+        """Returns the path to a part's markdown file if it exists."""
+        content_path = Path(RESULTS_DIR / f"{task_id}_part_{part_index:03d}.md")
+        if await content_path.exists():
+            return content_path
+        return None
+
+    async def download_full_content(self, task_id: str) -> Path | None:
+        """Returns the path to the merged markdown file. Creates it if needed."""
+        task_data = await self.redis.hgetall(f"task:{task_id}")
+        if not task_data:
+            return None
+
+        merged_path = Path(RESULTS_DIR / f"{task_id}_merged.md")
+        if await merged_path.exists():
+            return merged_path
+
+        total_parts = int(task_data.get("total_parts", 0))
+        if total_parts == 0:
+            return None
+
+        # Merge all completed parts into a single file
+        async with await open_file(merged_path, "w", encoding="utf-8") as out:
+            for i in range(total_parts):
+                part_path = Path(RESULTS_DIR / f"{task_id}_part_{i:03d}.md")
+                if await part_path.exists():
+                    async with await open_file(part_path, "r", encoding="utf-8") as f:
+                        await out.write(await f.read())
+                        await out.write("\n\n---\n\n")
+        return merged_path

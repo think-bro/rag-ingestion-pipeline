@@ -10,11 +10,11 @@ dev:
 
 # Shut down the system and remove containers
 down:
-	docker compose down
+	docker compose --profile frontend down
 
 # Build the images without starting containers
 build:
-	docker compose build
+	docker compose --profile frontend build
 
 # --- LOCAL DEVELOPMENT (BACKUP AND CODE QUALITY) ---
 

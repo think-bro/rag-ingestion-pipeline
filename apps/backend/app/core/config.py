@@ -17,3 +17,9 @@ CANCEL_KEY_PREFIX = "cancel_task:"
 CANCEL_KEY_TTL = 3600  # 1 hour
 SUBPROCESS_POLL_INTERVAL = 1.0  # seconds
 SUBPROCESS_TERMINATE_TIMEOUT = 3.0  # seconds
+
+# PDF Splitting Configuration
+SPLIT_THRESHOLD = int(os.getenv("SPLIT_THRESHOLD", "10"))
+PAGES_PER_PART = int(os.getenv("PAGES_PER_PART", "10"))
+PARTS_DIR = STORAGE_DIR / "parts"
+PARTS_DIR.mkdir(parents=True, exist_ok=True)

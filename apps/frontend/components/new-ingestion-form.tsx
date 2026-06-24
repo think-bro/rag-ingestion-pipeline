@@ -103,7 +103,7 @@ export function NewIngestionForm({
       accept: {
         "application/pdf": [".pdf"],
       },
-      maxSize: 100 * 1024 * 1024, // TODO: Remove or increase this limit once backend async PDF splitting is implemented
+      maxSize: 512 * 1024 * 1024, // TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
       disabled: isFormPending,
       onDrop,
     });

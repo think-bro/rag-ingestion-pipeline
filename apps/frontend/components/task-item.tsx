@@ -44,7 +44,7 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
 
   if (task.status === "pending") {
     StatusIcon = ClockIcon;
-    iconColor = "text-amber-500";
+    iconColor = "text-slate-500";
   } else if (task.status === "processing") {
     iconColor = "text-blue-500 animate-spin";
   } else if (task.status === "cancelling") {
@@ -57,7 +57,7 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
     iconColor = "text-red-500";
   } else if (task.status === "cancelled") {
     StatusIcon = BanIcon;
-    iconColor = "text-zinc-500";
+    iconColor = "text-orange-500";
   }
 
   return (
