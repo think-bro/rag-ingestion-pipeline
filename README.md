@@ -11,65 +11,6 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 3. **Embedding (Planned):** Generating vector embeddings for each chunk.
 4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
 
-## Architecture
-
-```mermaid
-sequenceDiagram
-    participant F as Frontend (Next.js)
-    participant B as Backend (Litestar)
-    participant R as Redis (Broker/Queue)
-    participant W as TaskIQ Worker
-    participant D as Disk (/storage)
-
-    Note over F,B: Phase 1: Pre-upload (Instant)
-    F->>B: POST /api/documents/uploads (multipart file upload)
-    B->>D: Save file to disk (/storage/uploads/{uuid}.ext)
-    B->>B: Extract page count via pypdfium2
-    B->>F: 201 Created {file_id: "uuid.ext", page_count: 14}
-    
-    opt If user cancels the process (Trash Icon or Modal Close)
-        F->>B: DELETE /api/documents/uploads/{file_id}
-        B->>D: Delete file from disk
-    end
-
-    Note over F,B: Phase 2: Start Ingestion
-    F->>B: POST /api/documents/parse {file_id: "uuid.ext", output_format: "markdown"}
-    B->>R: Write initial task state (pending) to Redis Hash
-    B->>R: Enqueue task (task_id, file_path, options)
-    B->>F: 202 Accepted {task_id: "abc-123"}
-
-    loop Every 2 seconds (adaptive polling)
-        F->>B: GET /api/documents/tasks/abc-123
-        B->>R: Read task metadata/status from Redis Hash
-        B->>D: Read content from disk ONLY IF completed
-        B->>F: {status: "processing"} or {status: "completed", content: "..."}
-    end
-    
-    opt User Cancels Task
-        F->>B: POST /api/documents/tasks/abc-123/cancel
-        B->>R: Write cancellation flag (cancel_task:abc-123)
-        B->>F: 202 Accepted {status: "cancelling"}
-    end
-
-    Note over W,D: Background Processing (1 Task per Worker)
-    W->>R: Dequeue task
-    W->>W: Spawn isolated subprocess (parse_worker.py)
-    loop Polling Loop (1s)
-        W->>R: Check cancellation flag
-        opt If Cancelled
-            W->>W: Send SIGTERM to subprocess
-            W->>R: Update task state to cancelled
-        end
-    end
-    W->>D: Read JSON IPC result from subprocess
-    W->>D: Delete original uploaded file (file_id)
-    W->>D: Write final parsed content to disk (.md)
-    W->>R: Update task state to completed or failed
-    
-    Note over W,D: Cron Job (Hourly)
-    W->>D: Clean up orphaned files older than 24h
-```
-
 ## Tech Stack
 - **Backend Framework:** [Litestar](https://github.com/litestar-org/litestar) (Python 3.14)
 - **Frontend Framework:** [Next.js](https://github.com/vercel/next.js) 16 (App Router, static export)
@@ -164,3 +105,94 @@ We welcome contributions! To maintain a clean codebase, we follow a strict Pull 
 We use **Conventional Commits** and **Google Release Please** for automated versioning and changelog generation. Please do not manually bump package versions.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full details on our branching strategy, architecture rules, and development setup. For AI agents working on this repository, please see [AGENTS.md](AGENTS.md).
+
+## How It Works (Sequence Diagram)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant F as Frontend (Next.js)
+    participant B as Backend (Litestar)
+    participant R as Redis (Broker/State)
+    participant W as TaskIQ Worker(s)
+    participant D as Disk (/storage)
+
+    rect rgba(0, 153, 255, 0.1)
+        Note over F,B: Phase 1: Pre-upload (Instant)
+        F->>B: POST /api/v1/documents/uploads (multipart file upload)
+        B->>D: Save file to disk (/storage/uploads/{uuid}.ext)
+        B->>B: Extract metadata (e.g., page count)
+        B->>F: 201 Created {file_id: "uuid.ext", page_count: 292}
+        
+        opt If user cancels the process (Trash Icon or Modal Close)
+            F->>B: DELETE /api/v1/documents/uploads/{file_id}
+            B->>D: Delete file from disk
+        end
+    end
+
+    rect rgba(0, 200, 83, 0.1)
+        Note over F,B: Phase 2: Start Ingestion (Splitting & Queuing)
+        F->>B: POST /api/v1/documents/parse {file_id: "uuid.ext"}
+        B->>D: Split PDF into chunks (e.g., 10 pages/part) -> /storage/parts/
+        B->>D: Delete original uploaded file
+        B->>R: Write master state (PENDING) & part hashes
+        loop For each part
+            B->>R: Enqueue part_task (task_id, part_index, part_file_path)
+        end
+        B->>F: 202 Accepted {task_id: "abc-123"}
+
+        loop Every 2s (active) or 10s (idle) polling
+            F->>B: GET /api/v1/documents/tasks/abc-123
+            B->>R: Read master state and all part hashes
+            B->>F: {status: "processing", parts: [...]} or {status: "completed"}
+        end
+        
+        opt User Cancels Master Task
+            F->>B: POST /api/v1/documents/tasks/abc-123/cancel
+            B->>R: Write cancellation flag (cancel_task:abc-123)
+            B->>F: 202 Accepted {status: "cancelling"}
+        end
+        
+        opt User Retries Failed Part
+            F->>B: POST /api/v1/documents/tasks/abc-123/parts/0/retry
+            B->>R: Remove from failed_set, Update part state
+            B->>R: Enqueue part_task
+            B->>F: 202 Accepted {status: "processing"}
+        end
+
+        opt User Deletes Master Task
+            F->>B: DELETE /api/v1/documents/tasks/abc-123
+            B->>R: Delete master hash and all sets
+            B->>D: Delete all part files and _merged.md
+            B->>F: 204 No Content
+        end
+    end
+
+    rect rgba(156, 39, 176, 0.1)
+        Note over W,D: Phase 3: Background Processing (Parallel Workers)
+        W->>R: Dequeue part_task
+        W->>W: Spawn isolated subprocess (parse_worker.py)
+        loop Polling Loop (1s)
+            W->>R: Check cancellation flag
+            opt If Cancelled
+                W->>W: Send SIGTERM to subprocess
+                W->>R: Add to cancelled_set
+            end
+        end
+        W->>D: Read JSON IPC result from subprocess
+        W->>D: Write parsed part content to disk (.md)
+        W->>R: Add to completed_set / failed_set
+        W->>R: Evaluate master status (COMPLETED if all parts done)
+        
+        opt User Downloads Merged File
+            F->>B: GET /api/v1/documents/tasks/abc-123/download
+            B->>D: Merge all part .md files into _merged.md
+            B->>F: Serve merged markdown
+        end
+    end
+
+    rect rgba(255, 152, 0, 0.1)
+        Note over W,D: Cron Job (Hourly)
+        W->>D: Clean up orphaned uploads older than 24h
+    end
+```

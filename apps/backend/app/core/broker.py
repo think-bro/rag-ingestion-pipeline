@@ -10,6 +10,8 @@ result_backend = RedisAsyncResultBackend(
 
 broker = RedisStreamBroker(
     url=REDIS_URL,
+    idle_timeout=7_200_000,
+    xread_count=1,
 ).with_result_backend(result_backend)
 
 taskiq_litestar.init(broker, "apps.backend.app.main:app")

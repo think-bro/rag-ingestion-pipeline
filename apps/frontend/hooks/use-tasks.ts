@@ -99,3 +99,70 @@ export function useCancelTask() {
     },
   });
 }
+
+/**
+ * Hook to retry a failed part of a parsing task.
+ */
+export function useRetryPart() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      taskId,
+      partIndex,
+    }: {
+      taskId: string;
+      partIndex: number;
+    }) => api.retryPart(taskId, partIndex),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: ["document-task", variables.taskId],
+      });
+    },
+  });
+}
+
+/**
+ * Hook to download a specific part's content.
+ */
+export function useDownloadPart() {
+  return useMutation({
+    mutationFn: ({
+      taskId,
+      partIndex,
+    }: {
+      taskId: string;
+      partIndex: number;
+    }) => api.downloadPartContent(taskId, partIndex),
+    onSuccess: (blob, variables) => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `part_${variables.partIndex}.md`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    },
+  });
+}
+
+/**
+ * Hook to download the full merged content.
+ */
+export function useDownloadFull() {
+  return useMutation({
+    mutationFn: (taskId: string) => api.downloadFullContent(taskId),
+    onSuccess: (blob, taskId) => {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `document_${taskId}_parsed.md`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    },
+  });
+}

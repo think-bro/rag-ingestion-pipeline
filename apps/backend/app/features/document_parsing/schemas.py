@@ -16,6 +16,14 @@ class TaskStatus(enum.StrEnum):
     CANCELLED = "cancelled"
 
 
+class PartStatus(enum.StrEnum):
+    WAITING = "waiting"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class OutputFormat(enum.StrEnum):
     MARKDOWN = "markdown"
     # TODO: Add support for JSON and other output formats later
@@ -32,20 +40,42 @@ class TaskResponse(BaseModel):
     message: str
 
 
+class PartResponse(BaseModel):
+    part_index: int
+    page_start: int
+    page_end: int
+    status: PartStatus
+    processing_time: Optional[float] = None
+    error: Optional[str] = None
+
+
 class TaskResultResponse(BaseModel):
     task_id: str
     status: TaskStatus
     filename: Optional[str] = None
     output_format: Optional[OutputFormat] = None
-    content: Optional[str] = None
     error: Optional[str] = None
     created_at: Optional[datetime] = None
     processing_time: Optional[float] = None
+    page_count: Optional[int] = None
+    file_size: Optional[int] = None
+    total_parts: Optional[int] = None
+    completed_parts: Optional[int] = None
+    parts: Optional[list[PartResponse]] = None
 
 
 class TaskListDTO(PydanticDTO[TaskResultResponse]):
     config = DTOConfig(
-        include={"task_id", "status", "filename", "created_at", "processing_time"}
+        include={
+            "task_id",
+            "status",
+            "filename",
+            "created_at",
+            "processing_time",
+            "page_count",
+            "total_parts",
+            "completed_parts",
+        }
     )
 
 

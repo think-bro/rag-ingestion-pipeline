@@ -80,9 +80,9 @@ def create_app() -> Litestar:
             "parser_service": Provide(provide_parser_service, sync_to_thread=False)
         },
         cors_config=cors_config,
-        request_max_body_size=100
+        request_max_body_size=512
         * 1024
-        * 1024,  # TODO: Implement async PDF splitting to handle >100MB files without OOM
+        * 1024,  # TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
         debug=True,
     )
 

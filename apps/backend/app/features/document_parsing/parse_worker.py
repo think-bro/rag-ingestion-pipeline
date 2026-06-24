@@ -2,7 +2,9 @@ import argparse
 import json
 import sys
 import signal
-from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.document_converter import DocumentConverter, PdfFormatOption
 
 
 def handle_sigterm(signum, frame):
@@ -22,7 +24,18 @@ def main():
     signal.signal(signal.SIGTERM, handle_sigterm)
 
     try:
-        converter = DocumentConverter()
+        # TODO: Make OCR and image generation toggles configurable via the frontend UI
+        pipeline_options = PdfPipelineOptions(
+            do_ocr=False,
+            generate_picture_images=False,
+            generate_page_images=False,
+        )
+
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+        )
         result = converter.convert(args.file_path)
 
         content = ""

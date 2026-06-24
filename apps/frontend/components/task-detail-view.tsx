@@ -3,12 +3,23 @@ import {
   Ban,
   Bug,
   ClockIcon,
-  Loader2,
+  Download,
   Upload,
 } from "lucide-react";
+import { PartCard } from "@/components/part-card";
 import { StateCard } from "@/components/state-card";
+import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useTaskResult } from "@/hooks/use-tasks";
+import { useDownloadFull, useTaskResult } from "@/hooks/use-tasks";
 import { formatProcessingTime } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
@@ -21,7 +32,7 @@ function TaskLoadingState({
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6 text-muted-foreground">
-      <Loader2 className="mb-4 h-8 w-8 animate-spin" />
+      <ClockIcon className="mb-4 size-8 animate-pulse text-amber-500" />
       <h3 className="font-medium text-foreground text-lg">{title}</h3>
       {description && <p className="mt-2 text-sm">{description}</p>}
     </div>
@@ -36,12 +47,12 @@ function TaskErrorState({
   onClear: () => void;
 }) {
   return (
-    <div className="flex flex-1 items-center justify-center p-6 text-destructive">
+    <div className="flex flex-1 items-center justify-center text-destructive">
       <StateCard
         action={{
           label: (
             <>
-              <Upload />
+              <Upload data-icon="inline-start" />
               Try another file
             </>
           ),
@@ -58,30 +69,16 @@ function TaskErrorState({
   );
 }
 
-function TaskPendingState({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center p-6 text-muted-foreground">
-      <ClockIcon className="mb-4 h-8 w-8 animate-pulse text-amber-500" />
-      <h3 className="font-medium text-foreground text-lg">{title}</h3>
-      {description && <p className="mt-2 text-sm">{description}</p>}
-    </div>
-  );
-}
-
 export function TaskDetailView({ taskId }: { taskId: string }) {
   const { data, isLoading, isError } = useTaskResult(taskId);
   const { setActiveTaskId } = useTaskStore();
+  const downloadFullMutation = useDownloadFull();
 
   if (isLoading) {
     return <TaskLoadingState title="Loading task details..." />;
   }
-  if (isError || !data || data.status === "failed") {
+
+  if (isError || !data) {
     return (
       <TaskErrorState
         error={data?.error}
@@ -89,69 +86,120 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       />
     );
   }
-  if (data.status === "pending") {
-    return (
-      <TaskPendingState
-        description="Your document is in the queue and will be processed shortly."
-        title={`Waiting for ${data.filename || "Document"}`}
-      />
-    );
-  }
-  if (data.status === "processing") {
-    return (
-      <TaskLoadingState
-        description="Please wait while the document is being parsed..."
-        title={`Processing ${data.filename || "Document"}`}
-      />
-    );
-  }
 
-  if (data.status === "cancelling") {
-    return (
-      <TaskLoadingState
-        description="The process is being stopped, please wait..."
-        title={`Cancelling ${data.filename || "Document"}`}
-      />
-    );
-  }
+  const total = data.total_parts || 0;
+  const completed = Math.min(data.completed_parts || 0, total);
+  const progressValue = total > 0 ? (completed / total) * 100 : 0;
 
-  if (data.status === "cancelled") {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6 text-muted-foreground">
-        <StateCard
-          action={{
-            label: (
-              <>
-                <Upload />
-                Upload a new file
-              </>
-            ),
-            onClick: () => setActiveTaskId(null),
-          }}
-          className="border-muted/20 bg-muted/5 hover:border-muted/30"
-          description="The processing of this document was stopped by the user."
-          icons={[Ban]}
-          title="Document Processing Cancelled"
-        />
-      </div>
-    );
-  }
+  const waiting = data.parts?.filter((p) => p.status === "waiting").length || 0;
+  const processing =
+    data.parts?.filter((p) => p.status === "processing").length || 0;
+  const failed = data.parts?.filter((p) => p.status === "failed").length || 0;
+  const cancelled =
+    data.parts?.filter((p) => p.status === "cancelled").length || 0;
+
+  const handleDownloadFull = () => {
+    downloadFullMutation.mutate(taskId);
+  };
 
   return (
     <ScrollArea className="w-full flex-1 overflow-y-auto">
-      <div className="flex flex-col gap-6 p-6">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-          {data.status === "completed" &&
-            typeof data.processing_time === "number" && (
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3 text-muted-foreground text-sm">
-                <ClockIcon className="size-4" />
-                <span>
-                  Processed in {formatProcessingTime(data.processing_time)}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+        {/* Master Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between">
+            <div className="flex flex-col gap-1.5">
+              <CardTitle className="text-xl">
+                {data.filename || "Document"}
+              </CardTitle>
+              <CardDescription>
+                {data.file_size
+                  ? `${(data.file_size / 1024 / 1024).toFixed(2)} MB`
+                  : "Unknown Size"}
+                {" • "}
+                {data.page_count || 0} Pages
+                {" • "}
+                {total} Parts
+                {cancelled > 0 && ` • ${cancelled} Cancelled`}
+                {data.created_at &&
+                  ` • Started at ${new Date(
+                    data.created_at
+                  ).toLocaleTimeString()}`}
+                {data.status === "completed" &&
+                  typeof data.processing_time === "number" && (
+                    <>
+                      {" • Total time: "}
+                      {formatProcessingTime(data.processing_time)}
+                    </>
+                  )}
+              </CardDescription>
+            </div>
+            <StatusBadge status={data.status} />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {completed} / {total} parts done
+                </span>
+                <span className="font-medium">
+                  {Math.round(progressValue)}%
                 </span>
               </div>
-            )}
-          <pre className="whitespace-pre-wrap text-sm">{data.content}</pre>
+              <Progress className="h-2" value={progressValue} />
+            </div>
+
+            <div className="mt-2 flex w-full items-center justify-between font-medium text-xs">
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500">
+                <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-500" />
+                {completed} Done
+              </div>
+              <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-500">
+                <span className="size-2 animate-pulse rounded-full bg-blue-600 dark:bg-blue-500" />
+                {processing} Processing
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-muted-foreground" />
+                {waiting} Waiting
+              </div>
+              <div className="flex items-center gap-1.5 text-destructive">
+                <span className="size-2 rounded-full bg-destructive" />
+                {failed} Failed
+              </div>
+              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+                <span className="size-2 rounded-full bg-amber-600 dark:bg-amber-500" />
+                {cancelled} Cancelled
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Parts List */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-row items-center justify-between">
+            <h3 className="font-semibold text-lg">Parts ({total})</h3>
+            <Button
+              className="cursor-pointer"
+              disabled={completed === 0 || downloadFullMutation.isPending}
+              onClick={handleDownloadFull}
+            >
+              <Download />
+              <span className="text-nowrap">Download Merged Document</span>
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3">
+            {data.parts?.map((part) => (
+              <PartCard key={part.part_index} part={part} taskId={taskId} />
+            ))}
+          </div>
         </div>
+
+        {data.status === "failed" && (
+          <TaskErrorState
+            error={data.error}
+            onClear={() => setActiveTaskId(null)}
+          />
+        )}
       </div>
       <ScrollBar orientation="vertical" />
     </ScrollArea>
