@@ -5,19 +5,29 @@ on:
     types: [published]
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [[ "$TAG" == backend-v* ]]; then
+            echo 'matrix={"include":[{"service":"rag-backend","context":".","dockerfile":"apps/backend/Dockerfile"}]}' >> $GITHUB_OUTPUT
+          elif [[ "$TAG" == frontend-v* ]]; then
+            echo 'matrix={"include":[{"service":"rag-frontend","context":"apps/frontend","dockerfile":"Dockerfile"}]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"include":[{"service":"rag-backend","context":".","dockerfile":"apps/backend/Dockerfile"},{"service":"rag-frontend","context":"apps/frontend","dockerfile":"Dockerfile"}]}' >> $GITHUB_OUTPUT
+          fi
+
   build-and-push:
+    needs: resolve
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - service: rag-backend
-            context: .
-            dockerfile: apps/backend/Dockerfile
-          - service: rag-frontend
-            context: apps/frontend
-            dockerfile: Dockerfile
-    
+      matrix: ${{ fromJson(needs.resolve.outputs.matrix) }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -9,7 +9,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "../../compose.yaml"
+          "path": "compose.yaml"
         }
       ]
     },
@@ -19,7 +19,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "../../compose.yaml"
+          "path": "compose.yaml"
         }
       ]
     }
