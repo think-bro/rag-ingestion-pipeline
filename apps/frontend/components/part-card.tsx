@@ -1,4 +1,4 @@
-import { Download, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDownloadPart, useRetryPart } from "@/hooks/use-tasks";
+import { useRetryPart } from "@/hooks/use-tasks";
 import type { PartResponse } from "@/lib/api";
 import { formatProcessingTime } from "@/lib/utils";
 
@@ -18,12 +18,12 @@ export function PartCard({
   taskId: string;
   part: PartResponse;
 }) {
-  const downloadMutation = useDownloadPart();
+  // const downloadMutation = useDownloadPart();
   const retryMutation = useRetryPart();
 
-  const handleDownload = () => {
-    downloadMutation.mutate({ taskId, partIndex: part.part_index });
-  };
+  // const handleDownload = () => {
+  //   downloadMutation.mutate({ taskId, partIndex: part.part_index });
+  // };
 
   const handleRetry = () => {
     retryMutation.mutate({ taskId, partIndex: part.part_index });
@@ -53,7 +53,7 @@ export function PartCard({
 
           {(part.status === "completed" || part.status === "failed") && (
             <div className="flex w-0 items-center justify-end overflow-hidden opacity-0 transition-all duration-300 group-hover:ml-2 group-hover:w-8 group-hover:opacity-100">
-              {part.status === "completed" && (
+              {/* {part.status === "completed" && (
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <Button
@@ -70,7 +70,7 @@ export function PartCard({
                     <p>Download Part</p>
                   </TooltipContent>
                 </Tooltip>
-              )}
+              )} */}
               {part.status === "failed" && (
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
