@@ -26,26 +26,35 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 - **Frontend Quality:** [Ultracite](https://github.com/haydenbleasel/ultracite) / [Biome](https://github.com/biomejs/biome) (lint/format)
 - **Logging:** [structlog](https://github.com/hynek/structlog)
 
-## Getting Started (For Users)
+## Quick Start (For Users)
 
-If you only want to use the application locally, you do not need any development tools installed.
+If you only want to run the application, you do not need to clone the repository or install any development tools.
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
-- [just](https://github.com/casey/just) command runner installed
 
 ### Installation & Running
 
-1. Clone the repository and navigate into the project directory:
+### Step 1: Download Configuration
+
+Download the deployment configuration file (`compose.yaml`). Choose the correct command for your operating system:
+
+**Linux / macOS:**
 ```bash
-git clone https://github.com/think-bro/rag-ingestion-pipeline.git
-cd rag-ingestion-pipeline
+curl -o compose.yaml https://raw.githubusercontent.com/think-bro/rag-ingestion-pipeline/master/compose.yaml
 ```
 
-2. Start the application. This handles all dependencies, including Docling's ML models, and ensures maximum performance by utilizing multiple background workers.
+**Windows (PowerShell):**
+```powershell
+irm "https://raw.githubusercontent.com/think-bro/rag-ingestion-pipeline/master/compose.yaml" -OutFile "compose.yaml"
+```
+
+### Step 2: Start the Application
+
+Start the application. This pulls the pre-built images from Docker Hub, including Docling's ML models.
+
 ```bash
-# Starts the entire stack (Frontend, Backend, Worker, Redis) in stable mode
-just run
+docker compose up -d
 ```
 
 The Backend API will be available at `http://localhost:8000`. <br>
@@ -53,7 +62,7 @@ The Frontend UI will be available at `http://localhost:3000`.
 
 To shut down the system:
 ```bash
-just down
+docker compose down
 ```
 
 ## Development Setup (For Contributors)
@@ -80,6 +89,11 @@ just dev
 just install
 
 just dev-frontend
+```
+
+3. **Alternative (Stable Mode):** To test the entire stack locally with production settings (compiled frontend, no hot-reload), use:
+```bash
+just run
 ```
 
 ### Code Quality

@@ -77,7 +77,7 @@ We strictly use `just` to orchestrate our workflows. You can view all available 
 
 | Command | Description |
 | :--- | :--- |
-| `just run` | Starts the entire stack (including frontend) in stable mode for end-users. |
+| `just run` | Starts the entire stack (including frontend) in stable mode for local testing. |
 | `just dev` | Starts the backend, worker, and Redis in watch mode (hot-reload active) for development. |
 | `just dev-frontend` | Starts the Next.js development server locally with HMR. |
 | `just down` | Shuts down the system and removes all containers. |

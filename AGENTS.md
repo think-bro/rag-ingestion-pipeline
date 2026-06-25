@@ -285,8 +285,9 @@ Heavy resources like `DocumentConverter` (which loads ML models) are initialized
 
 ## Docker Architecture
 
-- The base `compose.yaml` defines the stable production-like environment.
-- The `compose.dev.yaml` acts as an override file for development. It uses `develop.watch` (Docker Compose Watch) to sync files from the host to the container instantly. It does **not** use bind mounts for code directories to preserve cross-platform I/O performance.
+- The base `compose.yaml` defines the stable production-like environment. It contains no `build` directives, only image names for deployment.
+- The `compose.run.yaml` acts as an override file that adds `build: context:` directives. It is used exclusively for building and running the code locally from source.
+- The `compose.dev.yaml` acts as an override file for development. It uses `develop.watch` (Docker Compose Watch) to sync files from the host to the container instantly without bind mounts to preserve cross-platform I/O performance. It also overrides `command` directives to enable hot-reload.
 - The frontend container is behind a `frontend` Docker Compose profile. Use `just run` to include it, or run the frontend locally with `just dev-frontend` for faster iteration during active development.
 - In production, the frontend is built as a static export and served by Nginx. Nginx also reverse-proxies `/api/` requests to the backend container.
 - ML model weights are persisted in named Docker volumes (`hf-models-cache`, `rapidocr-models-cache`) to avoid re-downloading on container restarts.

@@ -5,11 +5,23 @@
   "packages": {
     "apps/backend": {
       "release-type": "python",
-      "package-name": "backend"
+      "package-name": "backend",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "../../compose.yaml"
+        }
+      ]
     },
     "apps/frontend": {
       "release-type": "node",
-      "package-name": "frontend"
+      "package-name": "frontend",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "../../compose.yaml"
+        }
+      ]
     }
   }
 }

@@ -1,10 +1,6 @@
 services:
   redis:
-    image: rag-ingestion-pipeline-redis
-    build:
-      context: .
-      dockerfile_inline: |
-        FROM redis:7-alpine
+    image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
@@ -17,10 +13,7 @@ services:
       retries: 5
 
   backend:
-    image: rag-ingestion-pipeline-backend:latest
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+    image: odest/rag-backend:0.4.0 # x-release-please-version
     ports:
       - "8000:8000"
     environment:
@@ -50,7 +43,7 @@ services:
       retries: 3
 
   worker:
-    image: rag-ingestion-pipeline-backend:latest
+    image: odest/rag-backend:0.4.0 # x-release-please-version
     environment:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
@@ -70,9 +63,7 @@ services:
 
   frontend:
     profiles: ["frontend"]
-    build:
-      context: apps/frontend
-      dockerfile: Dockerfile
+    image: odest/rag-frontend:0.4.0 # x-release-please-version
     ports:
       - "3000:8080"
     restart: unless-stopped

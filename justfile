@@ -2,19 +2,19 @@
 
 # Runs the ENTIRE stack (including frontend) in stable mode, no hot-reload
 run:
-	docker compose --profile frontend up --build
+	docker compose -f compose.yaml -f compose.run.yaml --profile frontend up --build
 
 # Runs backend, worker, and redis in watch mode (hot-reload active)
 dev:
-	docker compose -f compose.yaml -f compose.dev.yaml up --build --watch
+	docker compose -f compose.yaml -f compose.run.yaml -f compose.dev.yaml up --build --watch
 
 # Shut down the system and remove containers
 down:
-	docker compose --profile frontend down
+	docker compose -f compose.yaml -f compose.run.yaml -f compose.dev.yaml --profile frontend down
 
 # Build the images without starting containers
 build:
-	docker compose --profile frontend build
+	docker compose -f compose.yaml -f compose.run.yaml -f compose.dev.yaml --profile frontend build
 
 # --- LOCAL DEVELOPMENT (BACKUP AND CODE QUALITY) ---
 

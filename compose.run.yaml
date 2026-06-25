@@ -1,0 +1,15 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+
+  frontend:
+    build:
+      context: apps/frontend
+      dockerfile: Dockerfile
