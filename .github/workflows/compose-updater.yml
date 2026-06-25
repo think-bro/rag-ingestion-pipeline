@@ -1,0 +1,49 @@
+name: Update compose.yaml for Release PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-compose:
+    # Only run if the PR was created by the release-please bot or github actions bot
+    if: github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'release-please[bot]' || github.event.pull_request.user.login == 'release-please-action[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read versions from manifest
+        id: versions
+        run: |
+          BACKEND=$(jq -r '.["apps/backend"]' .release-please-manifest.json)
+          FRONTEND=$(jq -r '.["apps/frontend"]' .release-please-manifest.json)
+          echo "backend=$BACKEND" >> $GITHUB_OUTPUT
+          echo "frontend=$FRONTEND" >> $GITHUB_OUTPUT
+
+      - name: Update compose.yaml image tags
+        run: |
+          sed -i "s|odest/rag-backend:[^ ]*|odest/rag-backend:${{ steps.versions.outputs.backend }}|g" compose.yaml
+          sed -i "s|odest/rag-frontend:[^ ]*|odest/rag-frontend:${{ steps.versions.outputs.frontend }}|g" compose.yaml
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if [[ -n $(git status -s compose.yaml) ]]; then
+            git add compose.yaml
+            git commit -m "chore: sync compose.yaml image tags for release"
+            git push
+          else
+            echo "No changes to compose.yaml."
+          fi

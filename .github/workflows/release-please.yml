@@ -12,50 +12,8 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    outputs:
-      pr: ${{ steps.release.outputs.pr }}
-      prs_created: ${{ steps.release.outputs.prs_created }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  sync-compose:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Parse PR metadata
-        id: pr
-        run: |
-          PR_JSON='${{ needs.release-please.outputs.pr }}'
-          BRANCH=$(echo "$PR_JSON" | jq -r '.headBranchName')
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
-      - name: Checkout release branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.pr.outputs.branch }}
-
-      - name: Read versions from manifest
-        id: versions
-        run: |
-          BACKEND=$(jq -r '.["apps/backend"]' .release-please-manifest.json)
-          FRONTEND=$(jq -r '.["apps/frontend"]' .release-please-manifest.json)
-          echo "backend=$BACKEND" >> $GITHUB_OUTPUT
-          echo "frontend=$FRONTEND" >> $GITHUB_OUTPUT
-
-      - name: Update compose.yaml image tags
-        run: |
-          sed -i "s|odest/rag-backend:[^ ]*|odest/rag-backend:${{ steps.versions.outputs.backend }}|g" compose.yaml
-          sed -i "s|odest/rag-frontend:[^ ]*|odest/rag-frontend:${{ steps.versions.outputs.frontend }}|g" compose.yaml
-
-      - name: Commit changes
-        run: |
-          git diff --quiet compose.yaml && exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add compose.yaml
-          git commit -m "chore: sync compose.yaml image tags"
-          git push
