@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.4.0...backend-v0.5.0) (2026-06-25)
+
+
+### Features
+
+* **document_parsing:** Add task cancellation API ([db780dc](https://github.com/think-bro/rag-ingestion-pipeline/commit/db780dc981a046f1c84c87303d7e395d85a8b3be))
+* **document_parsing:** Add task cancellation API (closes [#8](https://github.com/think-bro/rag-ingestion-pipeline/issues/8)) ([a3790d9](https://github.com/think-bro/rag-ingestion-pipeline/commit/a3790d98ac02cc309be03b1bb0fc1fc3236c22a6))
+* **document_parsing:** Add task cancellation API (closes [#8](https://github.com/think-bro/rag-ingestion-pipeline/issues/8)) ([db780dc](https://github.com/think-bro/rag-ingestion-pipeline/commit/db780dc981a046f1c84c87303d7e395d85a8b3be))
+* **document_parsing:** Asynchronous PDF splitting and parallel processing ([e94590e](https://github.com/think-bro/rag-ingestion-pipeline/commit/e94590e41686df23e73d1cacad57055f62fbec43))
+* **document_parsing:** Implement asynchronous PDF splitting and parallel processing ([45dae07](https://github.com/think-bro/rag-ingestion-pipeline/commit/45dae07a4b6b6db6d47494770fb99016794b0b0d)), closes [#10](https://github.com/think-bro/rag-ingestion-pipeline/issues/10)
+* Implement two-step upload flow with enhanced UI and time tracking ([088488c](https://github.com/think-bro/rag-ingestion-pipeline/commit/088488ce34c39eb5df5000bb85deb884aadbd6ee))
+* **root:** Track task processing time and format file sizes ([bc0fdd6](https://github.com/think-bro/rag-ingestion-pipeline/commit/bc0fdd6a786371241325063ae8d93126c8569da5))
+
 ## [0.4.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.3.0...backend-v0.4.0) (2026-06-21)
 
 
