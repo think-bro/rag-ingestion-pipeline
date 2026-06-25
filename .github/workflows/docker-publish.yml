@@ -3,16 +3,31 @@ name: Build and Push Docker Images
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag name (e.g. backend-v0.5.0 or frontend-v0.5.0)"
+        required: true
+        type: string
 
 jobs:
   resolve:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      version: ${{ steps.set-matrix.outputs.version }}
     steps:
       - id: set-matrix
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" == "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ github.event.inputs.tag_name }}"
+          fi
+          
+          VERSION="${TAG#*-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
           if [[ "$TAG" == backend-v* ]]; then
             echo 'matrix={"include":[{"service":"rag-backend","context":".","dockerfile":"apps/backend/Dockerfile"}]}' >> $GITHUB_OUTPUT
           elif [[ "$TAG" == frontend-v* ]]; then
@@ -52,9 +67,10 @@ jobs:
         with:
           images: odest/${{ matrix.service }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=${{ needs.resolve.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=semver,pattern={{major}},enable=${{ github.event_name != 'workflow_dispatch' }}
             type=raw,value=latest
 
       - name: Build and push
@@ -75,6 +91,6 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: cves,sbom
-          image: odest/${{ matrix.service }}:${{ steps.meta.outputs.version }}
+          image: odest/${{ matrix.service }}:${{ needs.resolve.outputs.version }}
           dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
