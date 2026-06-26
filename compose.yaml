@@ -1,3 +1,5 @@
+name: rag-ingestion-pipeline
+
 services:
   redis:
     image: redis:7-alpine
@@ -62,7 +64,6 @@ services:
         condition: service_healthy
 
   frontend:
-    profiles: ["frontend"]
     image: odest/rag-frontend:0.5.0
     ports:
       - "3000:8080"

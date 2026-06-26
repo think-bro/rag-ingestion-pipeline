@@ -51,8 +51,11 @@ export function PartCard({
         <div className="flex items-center">
           <StatusBadge status={part.status} />
 
-          {(part.status === "completed" || part.status === "failed") && (
+          {part.status === "failed" && (
             <div className="flex w-0 items-center justify-end overflow-hidden opacity-0 transition-all duration-300 group-hover:ml-2 group-hover:w-8 group-hover:opacity-100">
+              {/* TODO: Uncomment this when part downloading is re-enabled. 
+                  NOTE: When you do, remember to change the wrapper condition above 
+                  back to \`(part.status === "completed" || part.status === "failed")\` */}
               {/* {part.status === "completed" && (
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
