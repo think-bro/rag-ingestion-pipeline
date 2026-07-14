@@ -149,7 +149,7 @@ export const api = {
   },
 
   async getPresets(): Promise<PresetsResponse> {
-    const res = await fetch(`${API_BASE}/presets`);
+    const res = await fetch(`${BASE_URL}/presets`);
     if (!res.ok) {
       throw new Error(`Failed to fetch presets: ${res.statusText}`);
     }

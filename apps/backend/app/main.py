@@ -18,6 +18,7 @@ from apps.backend.app.features.document_parsing.controller import ParserControll
 from apps.backend.app.features.document_parsing.service import ParserService
 from apps.backend.app.features.document_chunking.controller import ChunkingController
 from apps.backend.app.features.document_chunking.service import ChunkingService
+from apps.backend.app.features.get_presets.controller import GetPresetsController
 import redis.asyncio as aioredis
 
 
@@ -78,7 +79,12 @@ def create_app() -> Litestar:
 
     v1_router = Router(
         path="/v1",
-        route_handlers=[UploadDocumentController, ParserController, ChunkingController],
+        route_handlers=[
+            UploadDocumentController,
+            ParserController,
+            ChunkingController,
+            GetPresetsController,
+        ],
     )
     api_router = Router(path="/api", route_handlers=[v1_router])
 

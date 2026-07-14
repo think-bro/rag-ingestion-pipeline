@@ -1,6 +1,5 @@
 import os
 import structlog
-from typing import Any
 from litestar import Controller, delete, get, post
 from litestar.exceptions import NotFoundException, ClientException
 from litestar.response import File
@@ -18,14 +17,6 @@ logger = structlog.get_logger()
 
 class ChunkingController(Controller):
     path = "/documents"
-
-    @get(path="/presets", status_code=200)
-    async def get_presets_endpoint(
-        self,
-        chunking_service: ChunkingService,
-    ) -> dict[str, Any]:
-        """Returns the registry of available chunking configuration presets."""
-        return await chunking_service.get_presets()
 
     @post(path="/chunk", status_code=202)
     async def chunk_document_endpoint(
