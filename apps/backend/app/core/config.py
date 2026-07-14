@@ -11,6 +11,8 @@ RESULTS_DIR = STORAGE_DIR / "results"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+CHUNKS_DIR = STORAGE_DIR / "chunks"
+CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Task Cancellation Constants
 CANCEL_KEY_PREFIX = "cancel_task:"

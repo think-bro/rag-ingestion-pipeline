@@ -179,6 +179,16 @@ async def parse_part_task(
         completed = await redis.scard(f"task:{task_id}:completed_set")
         await redis.hset(f"task:{task_id}", "completed_parts", completed)
 
+        # Free up disk space by deleting the processed PDF part
+        if part_file_path and os.path.exists(part_file_path):
+            try:
+                os.remove(part_file_path)
+                logger.info(
+                    "deleted_completed_part_pdf", task_id=task_id, part_index=part_index
+                )
+            except Exception as e:
+                logger.error("failed_to_delete_part_pdf", error=str(e))
+
     elif part_status == PartStatus.FAILED.value:
         await redis.sadd(f"task:{task_id}:failed_set", part_index)
 

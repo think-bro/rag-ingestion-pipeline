@@ -13,4 +13,6 @@ dependencies = [
     "torch",
     "torchvision",
     "redis[hiredis]>=7.4.1",
+    "chonkie>=1.7.0",
+    "langchain-text-splitters>=1.1.2",
 ]
