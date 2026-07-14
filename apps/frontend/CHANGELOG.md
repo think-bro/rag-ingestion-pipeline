@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.5.0...frontend-v0.6.0) (2026-07-14)
+
+
+### Features
+
+* **frontend:** implement chunking configuration ui and api integration ([66bef45](https://github.com/think-bro/rag-ingestion-pipeline/commit/66bef452b29a09f433c93082e1b501d1f7850055))
+* Implement recursive document chunking to pipeline ([a1fd0fb](https://github.com/think-bro/rag-ingestion-pipeline/commit/a1fd0fb2494458be2a412b8e0dd6e247849ec0de))
+
 ## [0.5.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.4.0...frontend-v0.5.0) (2026-06-25)
 
 

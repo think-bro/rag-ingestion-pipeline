@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.5.0...backend-v0.6.0) (2026-07-14)
+
+
+### Features
+
+* **backend:** implement recursive document chunking service and controllers ([de0961b](https://github.com/think-bro/rag-ingestion-pipeline/commit/de0961b0133e38599d6a478bc3aefef492c3cb6b))
+* Implement recursive document chunking to pipeline ([a1fd0fb](https://github.com/think-bro/rag-ingestion-pipeline/commit/a1fd0fb2494458be2a412b8e0dd6e247849ec0de))
+
 ## [0.5.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.4.0...backend-v0.5.0) (2026-06-25)
 
 
