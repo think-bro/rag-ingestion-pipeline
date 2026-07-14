@@ -1,15 +1,22 @@
 "use client";
 
 import { DatabaseSearch, FileText, Plus, Upload } from "lucide-react";
+
 import { StateCard } from "@/components/state-card";
 import { TaskDetailView } from "@/components/task-detail-view";
 import { useTaskStore } from "@/store/task-store";
 
 export default function Page() {
-  const { activeTaskId, setNewIngestionModalOpen } = useTaskStore();
+  const { activeTaskId, activeTaskType, setNewIngestionModalOpen } =
+    useTaskStore();
 
   if (activeTaskId) {
-    return <TaskDetailView taskId={activeTaskId} />;
+    return (
+      <TaskDetailView
+        taskId={activeTaskId}
+        taskType={activeTaskType || "parsing"}
+      />
+    );
   }
 
   return (

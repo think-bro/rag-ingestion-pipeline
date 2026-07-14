@@ -6,8 +6,8 @@ An asynchronous document ingestion pipeline for RAG (Retrieval-Augmented Generat
 This project processes raw documents (like PDFs, etc.) and prepares them for vector search. It is structured as a monorepo containing a Litestar backend and a Next.js frontend, with TaskIQ handling async processing.
 
 **Pipeline Stages:**
-1. **Parsing (Current Stage):** Extracts structured content from documents using Docling. Outputs structured Markdown.
-2. **Chunking (Planned):** Splitting the parsed document into semantic chunks.
+1. **Parsing:** Extracts structured content from raw documents using Docling. Outputs structured Markdown.
+2. **Chunking:** Splits the parsed document into hierarchical and token-aware recursive chunks using LangChain and Chonkie. Outputs flattened JSON ready for vector ingestion.
 3. **Embedding (Planned):** Generating vector embeddings for each chunk.
 4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
 
@@ -17,6 +17,7 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 - **UI Components:** [shadcn/ui](https://github.com/shadcn-ui/ui) with [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) v4
 - **Task Queue:** [TaskIQ](https://github.com/taskiq-python/taskiq) with [Redis](https://github.com/redis/redis/)
 - **Document Parsing:** [Docling](https://github.com/docling-project/docling)
+- **Document Chunking:** [Chonkie](https://github.com/feyninc/chonkie) and [LangChain](https://github.com/langchain-ai/langchain)
 - **State Management:** [Zustand](https://github.com/pmndrs/zustand), [TanStack Query](https://github.com/TanStack/query)
 - **Containerization:** [Docker](https://www.docker.com/)
 - **Backend Package Management:** [uv](https://github.com/astral-sh/uv)

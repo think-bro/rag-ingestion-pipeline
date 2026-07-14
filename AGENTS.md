@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. Future pipeline stages, chunking, embedding, vector storage, are not yet implemented.
+Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. It also supports recursive chunking via Chonkie and LangChain. Future pipeline stages (embedding, vector storage) are not yet implemented.
 
 ## Tech Stack
 
-- Python 3.14, Docling, Pydantic, structlog
+- Python 3.14, Docling, Chonkie, LangChain, Pydantic, structlog
 - Backend: Litestar
 - Frontend: Next.js 16 (App Router, static export), React 19, shadcn/ui, Tailwind CSS v4
 - State Management: Zustand (client state), TanStack Query (server state)
@@ -26,8 +26,15 @@ apps/
 │   │   ├── main.py                  # App factory, lifespan, DI, CORS
 │   │   ├── core/
 │   │   │   ├── broker.py            # TaskIQ broker + Redis result backend
-│   │   │   └── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
+│   │   │   ├── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
+│   │   │   └── presets.py           # Chunk configuration presets
 │   │   └── features/
+│   │       ├── document_chunking/   # Hierarchical and recursive chunking
+│   │       │   ├── controller.py    # HTTP endpoints
+│   │       │   ├── service.py       # Task submission
+│   │       │   ├── schemas.py       # Pydantic chunk models
+│   │       │   ├── tasks.py         # TaskIQ background tasks
+│   │       │   └── chunk_worker.py  # Subprocess for tokenizer & chunker
 │   │       └── document_parsing/
 │   │           ├── controller.py    # HTTP endpoints (parse, tasks, delete)
 │   │           ├── service.py       # Business logic, file I/O, task submission
@@ -43,7 +50,9 @@ apps/
     ├── components/
     │   ├── app-layout.tsx           # SidebarProvider + breadcrumb header
     │   ├── app-sidebar.tsx          # Sidebar with task list
-    │   ├── new-ingestion-form.tsx   # File upload form (react-dropzone)
+    │   ├── custom-metadata-inputs.tsx # Dynamic metadata fields
+    │   ├── item-card.tsx            # Part/Chunk display card
+    │   ├── new-ingestion-form.tsx   # File upload and config form
     │   ├── new-ingestion-modal.tsx  # Responsive dialog/drawer
     │   ├── task-detail-view.tsx     # Parsed content display
     │   ├── task-item.tsx            # Sidebar task entry with context menu
@@ -262,14 +271,14 @@ The backend API uses URL path versioning (e.g., `/api/v1/`).
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
 1. **Upload Phase**: `POST /api/v1/documents/uploads` endpoint accepts a multipart file (up to 512MB), saves it to `/storage/uploads/`, extracts metadata (e.g., page count), and returns `file_id`.
-2. **Parse & Split Phase**: `POST /api/v1/documents/parse` receives the `file_id`, synchronously splits the PDF into smaller chunks (e.g., 10 pages/part) in `/storage/parts/`, deletes the original file, and writes a master `PENDING` state to Redis. It then enqueues multiple parallel TaskIQ background tasks (`parse_part_task.kiq()`) and returns a `task_id`.
+2. **Task Initialization**: Users select either parsing (`POST /api/v1/documents/parse`) or chunking (`POST /api/v1/documents/chunk`). The endpoint splits the PDF into smaller parts in `/storage/parts/` (for parsing) or loads the uploaded Markdown file (for chunking). It writes a master `PENDING` state to Redis, enqueues parallel TaskIQ background tasks, and returns a `task_id`.
 3. **Parallel Processing**: The actual processing is executed by background `worker` processes. Each worker handles a specific part. To prevent Out-Of-Memory (OOM) errors and allow parallelization, workers process smaller PDF parts.
-4. **Subprocess Isolation**: To support graceful cancellation and prevent memory leaks, CPU-intensive work (e.g., `DocumentConverter.convert()`) is isolated into a separate OS subprocess (`parse_worker.py`). The TaskIQ worker runs an asynchronous polling loop to monitor the subprocess and a cancellation flag in Redis.
+4. **Subprocess Isolation**: To support graceful cancellation and prevent memory leaks, CPU-intensive and ML-heavy work is isolated into a separate OS subprocess (`parse_worker.py` for Docling, `chunk_worker.py` for Chonkie/LangChain). The TaskIQ worker runs an asynchronous polling loop to monitor the subprocess and a cancellation flag in Redis.
 5. **Cancellation**: If a user cancels the master task (`POST /api/v1/documents/tasks/{task_id}/cancel`), a flag is written to Redis. Workers detect this, send a `SIGTERM` to their subprocesses to kill them gracefully, and update the part state to the `cancelled_set`.
 6. **IPC Communication**: The subprocess communicates back to the parent worker using a temporary JSON file (IPC) to avoid `stdout` pipe deadlocks with massive Markdown outputs.
-7. **State Management**: The worker adds the part index to specific Redis Sets (`completed_set`, `failed_set`, or `cancelled_set`) and writes the parsed content to disk as `.md` files (`/storage/results/{task_id}_part_{index}.md`). The master task status only evaluates to `FAILED` or `COMPLETED` when all parts are finished.
+7. **State Management**: The worker adds the part index to specific Redis Sets (`completed_set`, `failed_set`, or `cancelled_set`) and writes the result to disk as `.md` or `.json` files (`/storage/results/{task_id}_part_{index}.ext`). The master task status only evaluates to `FAILED` or `COMPLETED` when all parts are finished.
 8. **Retry Mechanism**: If a part fails, users can retry it via `POST /api/v1/documents/tasks/{task_id}/parts/{part_index}/retry`. This removes the part from `failed_set`, updates its status to `PROCESSING`, and re-enqueues the `part_task`.
-9. **Data Retrieval**: `GET /api/v1/documents/tasks/{task_id}` reads the master state and all part states from Redis sets. `GET /api/v1/documents/tasks/{task_id}/download` triggers the backend to dynamically merge all completed part `.md` files into a single `_merged.md` file and serves it to the user.
+9. **Data Retrieval**: `GET /api/v1/documents/tasks/{task_id}` reads the master state and all part states from Redis sets. `GET /api/v1/documents/tasks/{task_id}/download` triggers the backend to dynamically merge all completed part files into a single `_merged.md` or `_merged.json` file and serves it to the user.
 10. **Frontend Polling**: The frontend uses **adaptive polling** (2s when active/cancelling, 10s when idle) via TanStack Query's `refetchInterval` to keep the UI in sync with the multi-part progress.
 11. **Reliability**: The `RedisStreamBroker` guarantees at-least-once delivery, so part tasks aren't lost if a worker crashes.
 12. **Cleanup**: A background cron task (`cleanup_orphaned_uploads_task`) runs hourly to delete uploaded files that were abandoned before parsing (older than 24 hours).
@@ -277,7 +286,8 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 **Important Files:**
 - `apps/backend/app/core/broker.py`: Centralized definition for the TaskIQ broker and result backend.
 - `apps/backend/app/core/config.py`: Storage path configuration (`UPLOAD_DIR`, `RESULTS_DIR`).
-- `apps/backend/app/features/document_parsing/tasks.py`: Contains the actual TaskIQ tasks (`@broker.task()`).
+- `apps/backend/app/features/document_parsing/tasks.py`: Contains parsing TaskIQ tasks (`@broker.task()`).
+- `apps/backend/app/features/document_chunking/tasks.py`: Contains chunking TaskIQ tasks (`@broker.task()`).
 
 ### Singleton Services
 

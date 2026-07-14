@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import React from "react";
+import { useState } from "react";
 import { NewIngestionForm } from "@/components/new-ingestion-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,10 +27,12 @@ import { useTaskStore } from "@/store/task-store";
 export function NewIngestionModal() {
   const { isNewIngestionModalOpen, setNewIngestionModalOpen } = useTaskStore();
   const isMobile = useIsMobile();
-  const [formState, setFormState] = React.useState({
+  const [formState, setFormState] = useState({
     hasFiles: false,
     isUploading: false,
     isSubmitting: false,
+    taskType: "unselected" as "unselected" | "parse" | "chunk",
+    preset: "unselected" as string,
   });
 
   const handleClose = () => setNewIngestionModalOpen(false);
@@ -82,7 +84,10 @@ export function NewIngestionModal() {
               disabled={
                 !formState.hasFiles ||
                 formState.isUploading ||
-                formState.isSubmitting
+                formState.isSubmitting ||
+                formState.taskType === "unselected" ||
+                (formState.taskType === "chunk" &&
+                  formState.preset === "unselected")
               }
               form="ingestion-form-mobile"
               size="lg"
@@ -138,7 +143,10 @@ export function NewIngestionModal() {
             disabled={
               !formState.hasFiles ||
               formState.isUploading ||
-              formState.isSubmitting
+              formState.isSubmitting ||
+              formState.taskType === "unselected" ||
+              (formState.taskType === "chunk" &&
+                formState.preset === "unselected")
             }
             form="ingestion-form-desktop"
             size="lg"

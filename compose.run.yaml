@@ -8,6 +8,11 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+    command: >-
+      taskiq worker apps.backend.app.core.broker:broker
+      apps.backend.app.features.document_parsing.tasks
+      apps.backend.app.features.document_chunking.tasks
+      --workers 2 --max-async-tasks 1 --max-prefetch 1
 
   frontend:
     build:

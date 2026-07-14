@@ -19,7 +19,7 @@ import { useTaskStore } from "@/store/task-store";
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { isMobile } = useSidebar();
-  const { setActiveTaskId } = useTaskStore();
+  const { setActiveTask } = useTaskStore();
   const { data: tasks = [] } = useTasks();
 
   return (
@@ -52,7 +52,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 className="h-10 w-full cursor-pointer gap-2 bg-primary font-medium text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                onClick={() => setActiveTaskId(null)}
+                onClick={() => setActiveTask(null)}
                 tooltip="New Ingestion"
               >
                 <PlusIcon className="size-4" />
@@ -80,7 +80,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
                   <TaskItem
                     isMobile={isMobile}
                     key={task.task_id}
-                    onSelectTask={setActiveTaskId}
+                    onSelectTask={setActiveTask}
                     task={task}
                   />
                 ))

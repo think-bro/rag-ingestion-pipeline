@@ -1,23 +1,66 @@
 "use client";
 
 import { FileText, Loader2, Trash } from "lucide-react";
-import React from "react";
-import { useDropzone } from "react-dropzone";
-
+import { useEffect, useState } from "react";
+import { type FileRejection, useDropzone } from "react-dropzone";
+import { CustomMetadataInputs } from "@/components/custom-metadata-inputs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-
-import { useSubmitTask } from "@/hooks/use-tasks";
-import { api, type UploadResponse } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useIngestionSubmit } from "@/hooks/use-ingestion-submit";
+import { usePresets, useSubmitTask } from "@/hooks/use-tasks";
+import { useUploadItems } from "@/hooks/use-upload-items";
 import { cn, formatBytes } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
-interface UploadItem {
-  error?: string;
-  file: globalThis.File;
-  id: string;
-  status: "uploading" | "success" | "error";
-  uploadResponse?: UploadResponse;
+const TASK_OPTIONS = [
+  { label: "Select a Task", value: "unselected" },
+  { label: "Parsing", value: "parse" },
+  { label: "Chunking", value: "chunk" },
+] as const;
+
+function getErrorMessage(
+  fileRejections: readonly FileRejection[],
+  taskType: string
+) {
+  if (fileRejections.length === 0) {
+    return null;
+  }
+
+  if (
+    taskType === "chunk" &&
+    fileRejections.some((r) =>
+      r.errors.some((e) => e.code === "too-many-files")
+    )
+  ) {
+    return "Chunking mode only supports a single file.";
+  }
+
+  if (taskType === "chunk") {
+    return "Invalid file. Please ensure it is a Markdown (.md) file.";
+  }
+
+  return "Invalid file. Please ensure it is a PDF under 512MB.";
+}
+
+function getAcceptedFiles(
+  taskType: string
+): Record<string, string[]> | undefined {
+  if (taskType === "chunk") {
+    return { "text/markdown": [".md"] };
+  }
+  if (taskType === "parse") {
+    return { "application/pdf": [".pdf"] };
+  }
+  return;
 }
 
 export function NewIngestionForm({
@@ -31,93 +74,51 @@ export function NewIngestionForm({
     hasFiles: boolean;
     isUploading: boolean;
     isSubmitting: boolean;
+    taskType: "unselected" | "parse" | "chunk";
+    preset: string;
   }) => void;
 }) {
-  const [items, setItems] = React.useState<UploadItem[]>([]);
-  const { setNewIngestionModalOpen, setActiveTaskId } = useTaskStore();
+  const { items, setItems, onDrop, removeFile } = useUploadItems();
   const { mutateAsync, isPending } = useSubmitTask();
-  const format = "markdown"; // TODO: Use state when multiple output formats are supported
+  const { data: CHUNK_PRESETS, isLoading: isLoadingPresets } = usePresets();
+  const { setActiveTask, setNewIngestionModalOpen } = useTaskStore();
 
-  const itemsRef = React.useRef(items);
-  itemsRef.current = items;
-
-  React.useEffect(() => {
-    return () => {
-      // Cleanup unsubmitted files when the modal/form unmounts
-      const unsubmitted = itemsRef.current.filter(
-        (i) => i.status === "success" && i.uploadResponse
-      );
-      for (const item of unsubmitted) {
-        if (item.uploadResponse) {
-          api.deleteUpload(item.uploadResponse.file_id).catch(console.error);
-        }
-      }
-    };
-  }, []);
+  const [taskType, setTaskType] = useState<"unselected" | "parse" | "chunk">(
+    "unselected"
+  );
+  const [preset, setPreset] = useState("unselected");
+  const [format, _setFormat] = useState("text");
+  const [customMetadata, setCustomMetadata] = useState<Record<string, string>>(
+    {}
+  );
 
   const isUploading = items.some((i) => i.status === "uploading");
   const isFormPending = isPending || isUploading;
 
-  React.useEffect(() => {
+  useEffect(() => {
     onStateChange?.({
       hasFiles: items.length > 0,
       isUploading,
       isSubmitting: isPending,
+      taskType,
+      preset,
     });
-  }, [items.length, isUploading, isPending, onStateChange]);
-
-  const onDrop = React.useCallback((acceptedFiles: globalThis.File[]) => {
-    const newItems = acceptedFiles.map((f) => ({
-      id: crypto.randomUUID(),
-      file: f,
-      status: "uploading" as const,
-    }));
-    setItems((prev) => [...prev, ...newItems]);
-
-    const uploadItem = async (item: (typeof newItems)[0]) => {
-      try {
-        const response = await api.uploadFile(item.file);
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id
-              ? { ...i, status: "success", uploadResponse: response }
-              : i
-          )
-        );
-      } catch (err) {
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? { ...i, status: "error", error: String(err) } : i
-          )
-        );
-      }
-    };
-
-    for (const item of newItems) {
-      uploadItem(item).catch(console.error);
-    }
-  }, []);
+  }, [items.length, isUploading, isPending, taskType, preset, onStateChange]);
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } =
     useDropzone({
-      accept: {
-        "application/pdf": [".pdf"],
-      },
+      accept: getAcceptedFiles(taskType),
       maxSize: 512 * 1024 * 1024, // TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
-      disabled: isFormPending,
+      maxFiles: taskType === "chunk" ? 1 : undefined,
+      disabled:
+        isFormPending ||
+        (taskType === "chunk" && items.length >= 1) ||
+        taskType === "unselected" ||
+        (taskType === "chunk" && preset === "unselected"),
       onDrop,
     });
 
-  const handleDelete = async (item: UploadItem) => {
-    if (item.uploadResponse) {
-      try {
-        await api.deleteUpload(item.uploadResponse.file_id);
-      } catch (error) {
-        console.error("Failed to delete orphaned upload", error);
-      }
-    }
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
-  };
+  const errorMessage = getErrorMessage(fileRejections, taskType);
 
   const filesList = items.map((item) => (
     <li className="relative" key={item.id}>
@@ -126,7 +127,7 @@ export function NewIngestionForm({
           <Button
             aria-label="Remove file"
             disabled={isFormPending}
-            onClick={() => handleDelete(item)}
+            onClick={() => removeFile(item.id)}
             size="icon"
             type="button"
             variant="ghost"
@@ -172,45 +173,95 @@ export function NewIngestionForm({
     </li>
   ));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const successfulItems = items.filter(
-      (i) => i.status === "success" && i.uploadResponse
-    );
-    if (successfulItems.length === 0) {
-      return;
-    }
-
-    try {
-      const uploadPromises = successfulItems.map((item) => {
-        if (!item.uploadResponse) {
-          throw new Error("Missing upload response");
-        }
-        return mutateAsync({
-          fileId: item.uploadResponse.file_id,
-          filename: item.uploadResponse.filename,
-          format,
-        });
-      });
-      const results = await Promise.all(uploadPromises);
-
-      setItems([]);
-      onSuccess();
-      setNewIngestionModalOpen(false);
-
-      if (results.length > 0) {
-        setActiveTaskId(results[0].task_id);
-      }
-    } catch (error) {
-      console.error("Submission failed", error);
-      // TODO: Toast
-    }
-  };
+  const handleSubmit = useIngestionSubmit({
+    items,
+    taskType,
+    preset,
+    format,
+    customMetadata,
+    onSuccess,
+    mutateAsync,
+    CHUNK_PRESETS,
+    setItems,
+    setNewIngestionModalOpen,
+    setActiveTask,
+  });
 
   return (
     <form id={id} onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-        {/* TODO: Add back task type and output format selects when they are implemented */}
+        <div className="col-span-full sm:col-span-3">
+          <Select
+            disabled={isFormPending}
+            onValueChange={(v: "unselected" | "parse" | "chunk") =>
+              setTaskType(v)
+            }
+            value={taskType}
+          >
+            <SelectTrigger className="w-full" id="task-type">
+              <SelectValue placeholder="Select task type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Tasks</SelectLabel>
+                {TASK_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {taskType === "chunk" && (
+          <div className="col-span-full sm:col-span-3">
+            <Select
+              disabled={isFormPending}
+              onValueChange={(v: string) => {
+                setPreset(v);
+                if (v === "unselected" || !CHUNK_PRESETS) {
+                  setCustomMetadata({});
+                } else {
+                  setCustomMetadata(
+                    CHUNK_PRESETS[v]?.config_overrides.custom_metadata || {}
+                  );
+                }
+              }}
+              value={preset}
+            >
+              <SelectTrigger className="w-full" id="preset">
+                <SelectValue placeholder="Select preset" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Presets</SelectLabel>
+                  <SelectItem value="unselected">Select a Preset</SelectItem>
+                  {isLoadingPresets ? (
+                    <SelectItem disabled value="loading">
+                      Loading...
+                    </SelectItem>
+                  ) : (
+                    Object.entries(CHUNK_PRESETS || {}).map(([presetId, p]) => (
+                      <SelectItem key={presetId} value={presetId}>
+                        {p.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <CustomMetadataInputs
+          CHUNK_PRESETS={CHUNK_PRESETS}
+          isFormPending={isFormPending}
+          preset={preset}
+          setCustomMetadata={setCustomMetadata}
+          taskType={taskType}
+        />
+
         <div className="col-span-full">
           <Label className="font-medium" htmlFor="file-upload-2">
             File(s) upload
@@ -221,6 +272,10 @@ export function NewIngestionForm({
               isDragActive
                 ? "border-primary bg-primary/10 ring-2 ring-primary/20"
                 : "border-border",
+              taskType === "unselected" ||
+                (taskType === "chunk" && preset === "unselected")
+                ? "cursor-not-allowed bg-muted/50 opacity-60"
+                : "",
               "mt-2 flex justify-center rounded-md border border-dashed px-6 py-20 transition-colors duration-200"
             )}
           >
@@ -229,20 +284,42 @@ export function NewIngestionForm({
                 aria-hidden={true}
                 className="mx-auto h-12 w-12 text-muted-foreground/80"
               />
-              <div className="mt-4 flex text-muted-foreground">
-                <p>Drag and drop or</p>
-                <span className="relative cursor-pointer rounded-sm pl-1 font-medium text-primary hover:text-primary/80 hover:underline hover:underline-offset-4">
-                  choose file(s)
-                  <input {...getInputProps()} className="sr-only" />
-                </span>
-                <p className="text-pretty pl-1">to upload</p>
+              <div className="mt-4 flex flex-col items-center text-muted-foreground">
+                {taskType === "unselected" ||
+                (taskType === "chunk" && preset === "unselected") ? (
+                  <p className="font-medium text-foreground text-sm">
+                    {taskType === "unselected"
+                      ? "Please select a Task Type first"
+                      : "Please select a Chunking Preset first"}
+                  </p>
+                ) : (
+                  <div className="flex">
+                    <p>Drag and drop or</p>
+                    <span className="relative cursor-pointer rounded-sm pl-1 font-medium text-primary hover:text-primary/80 hover:underline hover:underline-offset-4">
+                      choose file(s)
+                      <input {...getInputProps()} className="sr-only" />
+                    </span>
+                    <p className="text-pretty pl-1">to upload</p>
+                  </div>
+                )}
               </div>
               <p className="mt-2 text-center text-muted-foreground/70 text-xs">
-                PDF documents up to 100MB
+                {(() => {
+                  if (taskType === "unselected") {
+                    return "Please select a Task Type first";
+                  }
+                  if (taskType === "chunk" && preset === "unselected") {
+                    return "Select a Chunking Preset to continue";
+                  }
+                  if (taskType === "chunk") {
+                    return "Markdown documents up to 100MB";
+                  }
+                  return "PDF documents up to 100MB";
+                })()}
               </p>
-              {fileRejections.length > 0 && (
+              {errorMessage && (
                 <p className="mt-3 text-center text-destructive text-sm">
-                  Invalid file. Please ensure it is a PDF under 100MB.
+                  {errorMessage}
                 </p>
               )}
             </div>

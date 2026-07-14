@@ -12,6 +12,8 @@ from apps.backend.app.core.broker import broker
 from apps.backend.app.core.redis_client import get_redis_pool
 from apps.backend.app.features.document_parsing.controller import ParserController
 from apps.backend.app.features.document_parsing.service import ParserService
+from apps.backend.app.features.document_chunking.controller import ChunkingController
+from apps.backend.app.features.document_chunking.service import ChunkingService
 import redis.asyncio as aioredis
 
 
@@ -33,9 +35,13 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     app.state.parser_service = ParserService(
         redis=app.state.redis,
     )
+    app.state.chunking_service = ChunkingService(
+        redis=app.state.redis,
+    )
     yield
 
     del app.state.parser_service
+    del app.state.chunking_service
 
     await app.state.redis_pool.disconnect()
     del app.state.redis
@@ -50,11 +56,18 @@ def provide_parser_service(state: State) -> ParserService:
     return state.parser_service
 
 
+def provide_chunking_service(state: State) -> ChunkingService:
+    """Dependency provider for ChunkingService using the global instance."""
+    return state.chunking_service
+
+
 def create_app() -> Litestar:
     """Application factory function."""
     cors_config = CORSConfig(allow_origins=["*"])
 
-    v1_router = Router(path="/v1", route_handlers=[ParserController])
+    v1_router = Router(
+        path="/v1", route_handlers=[ParserController, ChunkingController]
+    )
     api_router = Router(path="/api", route_handlers=[v1_router])
 
     structlog_config = StructlogConfig(
@@ -77,7 +90,8 @@ def create_app() -> Litestar:
         plugins=[StructlogPlugin(config=structlog_config)],
         lifespan=[app_lifespan],
         dependencies={
-            "parser_service": Provide(provide_parser_service, sync_to_thread=False)
+            "parser_service": Provide(provide_parser_service, sync_to_thread=False),
+            "chunking_service": Provide(provide_chunking_service, sync_to_thread=False),
         },
         cors_config=cors_config,
         request_max_body_size=512
