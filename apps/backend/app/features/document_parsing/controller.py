@@ -1,19 +1,14 @@
 import os
 import structlog
 from litestar import Controller, delete, get, post
-from litestar.datastructures import UploadFile
-from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotFoundException, ClientException
-from litestar.params import Body
 from litestar.response import File
-from typing import Annotated
 
 from .schemas import (
     TaskResponse,
     TaskResultResponse,
     TaskStatus,
     TaskListDTO,
-    UploadResponse,
     ParseRequest,
 )
 from .service import ParserService
@@ -23,33 +18,6 @@ logger = structlog.get_logger()
 
 class ParserController(Controller):
     path = "/documents"
-
-    @post(path="/uploads", status_code=201)
-    async def upload_document_endpoint(
-        self,
-        data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
-        parser_service: ParserService,
-    ) -> UploadResponse:
-        """
-        Pre-uploads a document and extracts metadata (like page count).
-        """
-        logger.info(
-            "received_upload_request",
-            filename=data.filename,
-            content_type=data.content_type,
-        )
-        return await parser_service.upload_file(data)
-
-    @delete(path="/uploads/{file_id:str}", status_code=204)
-    async def delete_upload_endpoint(
-        self,
-        file_id: str,
-        parser_service: ParserService,
-    ) -> None:
-        """
-        Deletes a pre-uploaded document.
-        """
-        await parser_service.delete_upload(file_id)
 
     @post(path="/parse", status_code=202)
     async def parse_document_endpoint(

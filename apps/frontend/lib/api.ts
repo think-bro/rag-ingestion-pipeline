@@ -99,10 +99,13 @@ export type CombinedTask =
   | (ParseTaskResponse & { task_type: "parsing" })
   | (ChunkTaskResponse & { task_type: "chunking" });
 
-const API_BASE =
+const BASE_URL =
   process.env.NODE_ENV === "development"
-    ? "http://127.0.0.1:8000/api/v1/documents"
-    : "/api/v1/documents";
+    ? "http://127.0.0.1:8000/api/v1"
+    : "/api/v1";
+
+const API_BASE = `${BASE_URL}/documents`;
+const UPLOADS_API = `${BASE_URL}/uploads`;
 
 export const api = {
   /**
@@ -123,7 +126,7 @@ export const api = {
     const formData = new FormData();
     formData.append("data", file);
 
-    const res = await fetch(`${API_BASE}/uploads`, {
+    const res = await fetch(UPLOADS_API, {
       method: "POST",
       body: formData,
     });
@@ -137,7 +140,7 @@ export const api = {
    * Deletes a pre-uploaded document.
    */
   async deleteUpload(fileId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/uploads/${fileId}`, {
+    const res = await fetch(`${UPLOADS_API}/${fileId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
