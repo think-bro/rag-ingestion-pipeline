@@ -12,8 +12,8 @@ permissions:
 
 jobs:
   update-compose:
-    # Only run if the PR was created by the release-please bot or github actions bot
-    if: github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'release-please[bot]' || github.event.pull_request.user.login == 'release-please-action[bot]'
+    # Only run for release-please PRs
+    if: startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
