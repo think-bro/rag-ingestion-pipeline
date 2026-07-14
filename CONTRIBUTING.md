@@ -37,7 +37,7 @@ This project is a **monorepo** containing a Litestar `backend` and a Next.js `fr
 
 ### Backend Architecture
 
-- **`apps/backend/app/features/`**: All domain-specific logic goes here. Each feature (like `document_parsing`) must be a self-contained module with its own `controller.py`, `service.py`, `schemas.py` (Pydantic models), and `tasks.py` (TaskIQ workers) or isolated subprocess scripts (like `parse_worker.py`).
+- **`apps/backend/app/features/`**: All domain-specific logic goes here. Each feature (like `parse_document`) must be a self-contained module with its own `controller.py`, `service.py`, `schemas.py` (Pydantic models), and `tasks.py` (TaskIQ workers) or isolated subprocess scripts (like `parse_worker.py`).
 - **`apps/backend/app/core/`**: Shared infrastructure like broker setup, configuration, and logging configuration goes here.
 
 **Do not** create layer-based directories at the top level (e.g., `apps/backend/app/controllers` or `apps/backend/app/services`).
@@ -95,8 +95,8 @@ To maintain code quality and a clean history, we use a branch-and-pull-request w
 1. **Branch Out:** Always create a new branch from `master` for your work. Use conventional naming based on the type of your work (e.g., `feat/pdf-parsing`, `fix/logger-init`).
 2. **Commit Locally:** We follow **[Conventional Commits](https://www.conventionalcommits.org/)** for our commit messages (`<type>(<scope>): <description>`).
    - **Types:** `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
-   - **Scopes:** Match the feature or area (e.g., `backend`, `frontend`, `root`, `document_parsing`)
-   - *Example:* `feat(document_parsing): Add PDF parsing support`
+   - **Scopes:** Match the feature or area (e.g., `backend`, `frontend`, `root`, `parse_document`)
+   - *Example:* `feat(parse_document): Add PDF parsing support`
 3. **Validate:** Before pushing, ensure your code meets our standards by running `just check`.
 4. **Pull Request:** Push your branch and open a Pull Request against `master`. 
    - We encourage opening "Draft" PRs early to get feedback during development.
