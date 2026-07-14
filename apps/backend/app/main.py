@@ -14,8 +14,8 @@ from apps.backend.app.features.upload_document.controller import (
     UploadDocumentController,
 )
 from apps.backend.app.features.upload_document.service import UploadDocumentService
-from apps.backend.app.features.document_parsing.controller import ParserController
-from apps.backend.app.features.document_parsing.service import ParserService
+from apps.backend.app.features.parse_document.controller import ParseDocumentController
+from apps.backend.app.features.parse_document.service import ParseDocumentService
 from apps.backend.app.features.document_chunking.controller import ChunkingController
 from apps.backend.app.features.document_chunking.service import ChunkingService
 from apps.backend.app.features.get_presets.controller import GetPresetsController
@@ -38,7 +38,7 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
 
     app.state.redis = aioredis.Redis(connection_pool=app.state.redis_pool)
     app.state.upload_service = UploadDocumentService()
-    app.state.parser_service = ParserService(
+    app.state.parse_document_service = ParseDocumentService(
         redis=app.state.redis,
     )
     app.state.chunking_service = ChunkingService(
@@ -47,7 +47,7 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     yield
 
     del app.state.upload_service
-    del app.state.parser_service
+    del app.state.parse_document_service
     del app.state.chunking_service
 
     await app.state.redis_pool.disconnect()
@@ -63,9 +63,9 @@ def provide_upload_service(state: State) -> UploadDocumentService:
     return state.upload_service
 
 
-def provide_parser_service(state: State) -> ParserService:
-    """Dependency provider for ParserService using the global instance."""
-    return state.parser_service
+def provide_parse_document_service(state: State) -> ParseDocumentService:
+    """Dependency provider for ParseDocumentService using the global instance."""
+    return state.parse_document_service
 
 
 def provide_chunking_service(state: State) -> ChunkingService:
@@ -81,7 +81,7 @@ def create_app() -> Litestar:
         path="/v1",
         route_handlers=[
             UploadDocumentController,
-            ParserController,
+            ParseDocumentController,
             ChunkingController,
             GetPresetsController,
         ],
@@ -109,7 +109,9 @@ def create_app() -> Litestar:
         lifespan=[app_lifespan],
         dependencies={
             "upload_service": Provide(provide_upload_service, sync_to_thread=False),
-            "parser_service": Provide(provide_parser_service, sync_to_thread=False),
+            "parse_document_service": Provide(
+                provide_parse_document_service, sync_to_thread=False
+            ),
             "chunking_service": Provide(provide_chunking_service, sync_to_thread=False),
         },
         cors_config=cors_config,

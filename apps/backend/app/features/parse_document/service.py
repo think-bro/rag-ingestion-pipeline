@@ -30,7 +30,7 @@ logger = structlog.get_logger()
 _pdf_split_lock = asyncio.Lock()
 
 
-class ParserService:
+class ParseDocumentService:
     def __init__(self, redis: Any):
         self.redis = redis
 

@@ -112,7 +112,7 @@ export const api = {
    * Fetches the entire history of parsed documents (and pending/processing ones).
    */
   async getParseTasks(): Promise<ParseTaskResponse[]> {
-    const res = await fetch(`${API_BASE}/tasks`);
+    const res = await fetch(`${BASE_URL}/parse-tasks`);
     if (!res.ok) {
       throw new Error(`Failed to fetch tasks: ${res.statusText}`);
     }
@@ -165,7 +165,7 @@ export const api = {
     presetData?: Preset
   ): Promise<{ task_id: string; status: string; message: string }> {
     const endpoint =
-      action === "chunk" ? `${API_BASE}/chunk` : `${API_BASE}/parse`;
+      action === "chunk" ? `${API_BASE}/chunk` : `${BASE_URL}/parse-tasks`;
     let body: Record<string, unknown>;
     if (action === "chunk") {
       if (!presetData) {
@@ -207,7 +207,7 @@ export const api = {
    * Gets details for a specific task (including large content payload).
    */
   async getParseTaskResult(taskId: string): Promise<ParseTaskResponse> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}`);
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch task result: ${res.statusText}`);
     }
@@ -218,7 +218,7 @@ export const api = {
    * Deletes a task result.
    */
   async deleteParseTask(taskId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -232,7 +232,7 @@ export const api = {
   async cancelParseTask(
     taskId: string
   ): Promise<{ task_id: string; status: string; message: string }> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}/cancel`, {
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}/cancel`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -249,7 +249,7 @@ export const api = {
     partIndex: number
   ): Promise<{ task_id: string; status: string; message: string }> {
     const res = await fetch(
-      `${API_BASE}/tasks/${taskId}/parts/${partIndex}/retry`,
+      `${BASE_URL}/parse-tasks/${taskId}/parts/${partIndex}/retry`,
       {
         method: "POST",
       }
@@ -265,7 +265,7 @@ export const api = {
    */
   async downloadPartContent(taskId: string, partIndex: number): Promise<Blob> {
     const res = await fetch(
-      `${API_BASE}/tasks/${taskId}/parts/${partIndex}/download`
+      `${BASE_URL}/parse-tasks/${taskId}/parts/${partIndex}/download`
     );
     if (!res.ok) {
       throw new Error(`Failed to download part: ${res.statusText}`);
@@ -277,7 +277,7 @@ export const api = {
    * Downloads the merged markdown content for the entire task.
    */
   async downloadParseFullContent(taskId: string): Promise<Blob> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}/download`);
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}/download`);
     if (!res.ok) {
       throw new Error(`Failed to download full content: ${res.statusText}`);
     }
