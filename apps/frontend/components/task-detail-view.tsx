@@ -6,7 +6,7 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { PartCard } from "@/components/part-card";
+import { ItemCard } from "@/components/item-card";
 import { StateCard } from "@/components/state-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,17 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useDownloadFull, useTaskResult } from "@/hooks/use-tasks";
+import {
+  useDownloadChunkFull,
+  useDownloadParseFull,
+  useTaskDetailData,
+} from "@/hooks/use-tasks";
+import type {
+  ChunkItem,
+  ChunkTaskResponse,
+  ParseTaskResponse,
+  PartResponse,
+} from "@/lib/api";
 import { formatProcessingTime } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
@@ -69,38 +79,62 @@ function TaskErrorState({
   );
 }
 
-export function TaskDetailView({ taskId }: { taskId: string }) {
-  const { data, isLoading, isError } = useTaskResult(taskId);
-  const { setActiveTaskId } = useTaskStore();
-  const downloadFullMutation = useDownloadFull();
+export function TaskDetailView({
+  taskId,
+  taskType = "parsing",
+}: {
+  taskId: string;
+  taskType?: "parsing" | "chunking";
+}) {
+  const {
+    isParsing,
+    isLoading,
+    isError,
+    rawData,
+    total,
+    completed,
+    progressValue,
+    waiting,
+    processing,
+    failed,
+    cancelled,
+    items,
+  } = useTaskDetailData(taskId, taskType);
+
+  const { setActiveTask } = useTaskStore();
+  const downloadParseMutation = useDownloadParseFull();
+  const downloadChunksMutation = useDownloadChunkFull();
 
   if (isLoading) {
     return <TaskLoadingState title="Loading task details..." />;
   }
 
-  if (isError || !data) {
+  if (isError || !rawData) {
     return (
       <TaskErrorState
-        error={data?.error}
-        onClear={() => setActiveTaskId(null)}
+        error={rawData?.error}
+        onClear={() => setActiveTask(null)}
       />
     );
   }
 
-  const total = data.total_parts || 0;
-  const completed = Math.min(data.completed_parts || 0, total);
-  const progressValue = total > 0 ? (completed / total) * 100 : 0;
-
-  const waiting = data.parts?.filter((p) => p.status === "waiting").length || 0;
-  const processing =
-    data.parts?.filter((p) => p.status === "processing").length || 0;
-  const failed = data.parts?.filter((p) => p.status === "failed").length || 0;
-  const cancelled =
-    data.parts?.filter((p) => p.status === "cancelled").length || 0;
+  const data = rawData as ParseTaskResponse & ChunkTaskResponse;
 
   const handleDownloadFull = () => {
-    downloadFullMutation.mutate(taskId);
+    if (isParsing) {
+      downloadParseMutation.mutate(taskId);
+    } else {
+      downloadChunksMutation.mutate(taskId);
+    }
   };
+
+  const isDownloading = isParsing
+    ? downloadParseMutation.isPending
+    : downloadChunksMutation.isPending;
+
+  const isTaskProcessing = ["pending", "processing", "cancelling"].includes(
+    data.status
+  );
 
   return (
     <ScrollArea className="w-full flex-1 overflow-y-auto">
@@ -117,9 +151,8 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
                   ? `${(data.file_size / 1024 / 1024).toFixed(2)} MB`
                   : "Unknown Size"}
                 {" • "}
-                {data.page_count || 0} Pages
-                {" • "}
-                {total} Parts
+                {isParsing ? `${data.page_count || 0} Pages • ` : ""}
+                {total} {isParsing ? "Parts" : "Chunks"}
                 {cancelled > 0 && ` • ${cancelled} Cancelled`}
                 {data.created_at &&
                   ` • Started at ${new Date(
@@ -140,7 +173,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
             <div className="flex flex-col gap-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {completed} / {total} parts done
+                  {completed} / {total} {isParsing ? "parts" : "chunks"} done
                 </span>
                 <span className="font-medium">
                   {Math.round(progressValue)}%
@@ -149,55 +182,79 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
               <Progress className="h-2" value={progressValue} />
             </div>
 
-            <div className="mt-2 flex w-full items-center justify-between font-medium text-xs">
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500">
-                <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-500" />
-                {completed} Done
+            {isParsing && (
+              <div className="mt-2 flex w-full items-center justify-between font-medium text-xs">
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500">
+                  <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-500" />
+                  {completed} Done
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-500">
+                  <span className="size-2 animate-pulse rounded-full bg-blue-600 dark:bg-blue-500" />
+                  {processing} Processing
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="size-2 rounded-full bg-muted-foreground" />
+                  {waiting} Waiting
+                </div>
+                <div className="flex items-center gap-1.5 text-destructive">
+                  <span className="size-2 rounded-full bg-destructive" />
+                  {failed} Failed
+                </div>
+                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+                  <span className="size-2 rounded-full bg-amber-600 dark:bg-amber-500" />
+                  {cancelled} Cancelled
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-500">
-                <span className="size-2 animate-pulse rounded-full bg-blue-600 dark:bg-blue-500" />
-                {processing} Processing
-              </div>
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="size-2 rounded-full bg-muted-foreground" />
-                {waiting} Waiting
-              </div>
-              <div className="flex items-center gap-1.5 text-destructive">
-                <span className="size-2 rounded-full bg-destructive" />
-                {failed} Failed
-              </div>
-              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
-                <span className="size-2 rounded-full bg-amber-600 dark:bg-amber-500" />
-                {cancelled} Cancelled
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Parts List */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-row items-center justify-between">
-            <h3 className="font-semibold text-lg">Parts ({total})</h3>
+            <h3 className="font-semibold text-lg">
+              {isParsing ? "Parts" : "Chunks"} ({total})
+            </h3>
             <Button
               className="cursor-pointer"
-              disabled={completed === 0 || downloadFullMutation.isPending}
+              disabled={isTaskProcessing || completed === 0 || isDownloading}
               onClick={handleDownloadFull}
             >
               <Download />
-              <span className="text-nowrap">Download Merged Document</span>
+              <span className="text-nowrap">
+                {isParsing ? "Download Merged Document" : "Download JSON"}
+              </span>
             </Button>
           </div>
           <div className="flex flex-col gap-3">
-            {data.parts?.map((part) => (
-              <PartCard key={part.part_index} part={part} taskId={taskId} />
-            ))}
+            {items?.map((item, idx: number) => {
+              if (isParsing) {
+                const parseItem = item as PartResponse;
+                return (
+                  <ItemCard
+                    item={parseItem}
+                    key={parseItem.part_index}
+                    taskId={taskId}
+                    type="parse"
+                  />
+                );
+              }
+              const chunkItem = item as ChunkItem;
+              return (
+                <ItemCard
+                  item={chunkItem}
+                  key={chunkItem.chunk_id || idx}
+                  type="chunk"
+                />
+              );
+            })}
           </div>
         </div>
 
         {data.status === "failed" && (
           <TaskErrorState
             error={data.error}
-            onClear={() => setActiveTaskId(null)}
+            onClear={() => setActiveTask(null)}
           />
         )}
       </div>

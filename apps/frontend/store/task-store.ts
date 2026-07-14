@@ -2,15 +2,21 @@ import { create } from "zustand";
 
 interface TaskState {
   activeTaskId: string | null;
+  activeTaskType: "parsing" | "chunking" | null;
   isNewIngestionModalOpen: boolean;
-  setActiveTaskId: (id: string | null) => void;
+  setActiveTask: (
+    id: string | null,
+    type?: "parsing" | "chunking" | null
+  ) => void;
   setNewIngestionModalOpen: (open: boolean) => void;
 }
 
 export const useTaskStore = create<TaskState>((set) => ({
   activeTaskId: null,
+  activeTaskType: null,
   isNewIngestionModalOpen: false,
 
-  setActiveTaskId: (id) => set({ activeTaskId: id }),
+  setActiveTask: (id, type = "parsing") =>
+    set({ activeTaskId: id, activeTaskType: id ? type : null }),
   setNewIngestionModalOpen: (open) => set({ isNewIngestionModalOpen: open }),
 }));

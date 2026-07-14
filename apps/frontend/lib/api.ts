@@ -6,6 +6,21 @@ export type TaskStatus =
   | "failed"
   | "cancelled";
 
+export interface PresetConfigOverrides {
+  chunk_overlap: number;
+  chunk_size: number;
+  custom_metadata?: Record<string, string>;
+  headers_to_split_on: [string, string][];
+}
+
+export interface Preset {
+  config_overrides: PresetConfigOverrides;
+  description: string;
+  name: string;
+}
+
+export type PresetsResponse = Record<string, Preset>;
+
 export type PartStatus =
   | "waiting"
   | "processing"
@@ -22,7 +37,7 @@ export interface PartResponse {
   status: PartStatus;
 }
 
-export interface TaskResultResponse {
+export interface ParseTaskResponse {
   completed_parts?: number;
   created_at?: string;
   error?: string;
@@ -44,6 +59,46 @@ export interface UploadResponse {
   size: number;
 }
 
+export interface ChunkConfig {
+  chunk_overlap: number;
+  chunk_size: number;
+  custom_metadata?: Record<string, string>;
+  headers_to_split_on: [string, string][];
+  min_characters_per_chunk: number;
+  strip_headers: boolean;
+}
+
+export interface ChunkItem {
+  chunk_id: string;
+  contextualized_text: string;
+  metadata: {
+    chunk_index: number;
+    token_count: number;
+    char_count: number;
+    source_file: string;
+    breadcrumb: string;
+    [key: string]: unknown;
+  };
+  text: string;
+}
+
+export interface ChunkTaskResponse {
+  chunks?: ChunkItem[];
+  config?: ChunkConfig;
+  created_at?: string;
+  error?: string;
+  file_size?: number;
+  filename?: string;
+  processing_time?: number;
+  status: TaskStatus;
+  task_id: string;
+  total_chunks?: number;
+}
+
+export type CombinedTask =
+  | (ParseTaskResponse & { task_type: "parsing" })
+  | (ChunkTaskResponse & { task_type: "chunking" });
+
 const API_BASE =
   process.env.NODE_ENV === "development"
     ? "http://127.0.0.1:8000/api/v1/documents"
@@ -53,7 +108,7 @@ export const api = {
   /**
    * Fetches the entire history of parsed documents (and pending/processing ones).
    */
-  async getTasks(): Promise<TaskResultResponse[]> {
+  async getParseTasks(): Promise<ParseTaskResponse[]> {
     const res = await fetch(`${API_BASE}/tasks`);
     if (!res.ok) {
       throw new Error(`Failed to fetch tasks: ${res.statusText}`);
@@ -90,24 +145,54 @@ export const api = {
     }
   },
 
-  /**
-   * Submits a pre-uploaded document for parsing.
-   */
+  async getPresets(): Promise<PresetsResponse> {
+    const res = await fetch(`${API_BASE}/presets`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch presets: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
   async submitTask(
     fileId: string,
     filename: string,
-    format = "markdown"
+    action: "parse" | "chunk" = "parse",
+    formatOrPreset?: string,
+    customMetadata?: Record<string, string>,
+    presetData?: Preset
   ): Promise<{ task_id: string; status: string; message: string }> {
-    const res = await fetch(`${API_BASE}/parse`, {
+    const endpoint =
+      action === "chunk" ? `${API_BASE}/chunk` : `${API_BASE}/parse`;
+    let body: Record<string, unknown>;
+    if (action === "chunk") {
+      if (!presetData) {
+        throw new Error("Preset data is required for chunking");
+      }
+      body = {
+        file_id: fileId,
+        filename,
+        config: {
+          chunk_size: presetData.config_overrides.chunk_size,
+          chunk_overlap: presetData.config_overrides.chunk_overlap,
+          headers_to_split_on: presetData.config_overrides.headers_to_split_on,
+          custom_metadata:
+            customMetadata || presetData.config_overrides.custom_metadata || {},
+        },
+      };
+    } else {
+      body = {
+        file_id: fileId,
+        filename,
+        output_format: formatOrPreset || "markdown",
+      };
+    }
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        file_id: fileId,
-        filename,
-        output_format: format,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       throw new Error(`Failed to submit task: ${res.statusText}`);
@@ -118,7 +203,7 @@ export const api = {
   /**
    * Gets details for a specific task (including large content payload).
    */
-  async getTaskResult(taskId: string): Promise<TaskResultResponse> {
+  async getParseTaskResult(taskId: string): Promise<ParseTaskResponse> {
     const res = await fetch(`${API_BASE}/tasks/${taskId}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch task result: ${res.statusText}`);
@@ -129,7 +214,7 @@ export const api = {
   /**
    * Deletes a task result.
    */
-  async deleteTask(taskId: string): Promise<void> {
+  async deleteParseTask(taskId: string): Promise<void> {
     const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
       method: "DELETE",
     });
@@ -141,7 +226,7 @@ export const api = {
   /**
    * Cancels an ongoing task.
    */
-  async cancelTask(
+  async cancelParseTask(
     taskId: string
   ): Promise<{ task_id: string; status: string; message: string }> {
     const res = await fetch(`${API_BASE}/tasks/${taskId}/cancel`, {
@@ -188,10 +273,57 @@ export const api = {
   /**
    * Downloads the merged markdown content for the entire task.
    */
-  async downloadFullContent(taskId: string): Promise<Blob> {
+  async downloadParseFullContent(taskId: string): Promise<Blob> {
     const res = await fetch(`${API_BASE}/tasks/${taskId}/download`);
     if (!res.ok) {
       throw new Error(`Failed to download full content: ${res.statusText}`);
+    }
+    return res.blob();
+  },
+
+  // --- Chunking Endpoints ---
+
+  async getChunkTasks(): Promise<ChunkTaskResponse[]> {
+    const res = await fetch(`${API_BASE}/chunk-tasks`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch chunk tasks: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async getChunkTaskResult(taskId: string): Promise<ChunkTaskResponse> {
+    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch chunk task result: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async deleteChunkTask(taskId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete chunk task: ${res.statusText}`);
+    }
+  },
+
+  async cancelChunkTask(
+    taskId: string
+  ): Promise<{ task_id: string; status: string; message: string }> {
+    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}/cancel`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to cancel chunk task: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async downloadChunks(taskId: string): Promise<Blob> {
+    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}/download`);
+    if (!res.ok) {
+      throw new Error(`Failed to download chunks: ${res.statusText}`);
     }
     return res.blob();
   },

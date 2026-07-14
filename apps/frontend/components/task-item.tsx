@@ -24,17 +24,17 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useCancelTask, useDeleteTask } from "@/hooks/use-tasks";
-import type { TaskResultResponse } from "@/lib/api";
+import type { CombinedTask } from "@/lib/api";
 import { useTaskStore } from "@/store/task-store";
 
 interface TaskItemProps {
   isMobile: boolean;
-  onSelectTask: (id: string) => void;
-  task: TaskResultResponse;
+  onSelectTask: (id: string, type: "parsing" | "chunking") => void;
+  task: CombinedTask;
 }
 
 export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
-  const { activeTaskId, setActiveTaskId } = useTaskStore();
+  const { activeTaskId, setActiveTask } = useTaskStore();
   const isActive = activeTaskId === task.task_id;
   const { mutateAsync: deleteTask, isPending: isDeleting } = useDeleteTask();
   const { mutateAsync: cancelTask, isPending: isCancelling } = useCancelTask();
@@ -65,7 +65,7 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
       <SidebarMenuButton
         className="h-10 cursor-pointer border border-transparent transition-all duration-200 data-active:border-sidebar-border data-active:shadow-xs"
         isActive={isActive}
-        onClick={() => onSelectTask(task.task_id)}
+        onClick={() => onSelectTask(task.task_id, task.task_type)}
         tooltip={task.filename}
       >
         <StatusIcon className={`size-4 shrink-0 ${iconColor}`} />
@@ -111,33 +111,34 @@ export function TaskItem({ task, isMobile, onSelectTask }: TaskItemProps) {
               isCancelling ||
               (task.status !== "pending" && task.status !== "processing")
             }
-            onClick={async (e) => {
+            onClick={(e) => {
               e.stopPropagation();
-              await cancelTask(task.task_id);
+              cancelTask({ taskId: task.task_id, taskType: task.task_type });
             }}
           >
-            <XCircleIcon className="mr-2 size-4 text-muted-foreground" />
-            <span>Cancel Ingestion</span>
+            <BanIcon className="mr-2 size-4 text-orange-500" />
+            <span>{isCancelling ? "Cancelling..." : "Cancel"}</span>
           </DropdownMenuItem>
+
           <DropdownMenuSeparator />
+
           <DropdownMenuItem
+            className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
             disabled={
               isDeleting ||
-              task.status === "pending" ||
               task.status === "processing" ||
               task.status === "cancelling"
             }
-            onClick={async (e) => {
+            onClick={(e) => {
               e.stopPropagation();
-              await deleteTask(task.task_id);
+              deleteTask({ taskId: task.task_id, taskType: task.task_type });
               if (isActive) {
-                setActiveTaskId(null);
+                setActiveTask(null);
               }
             }}
-            variant="destructive"
           >
-            <Trash2Icon className="mr-2 size-4 text-destructive" />
-            <span>Delete Ingestion</span>
+            <Trash2Icon className="mr-2 size-4" />
+            <span>{isDeleting ? "Deleting..." : "Delete"}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
