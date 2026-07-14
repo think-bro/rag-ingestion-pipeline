@@ -104,7 +104,6 @@ const BASE_URL =
     ? "http://127.0.0.1:8000/api/v1"
     : "/api/v1";
 
-const API_BASE = `${BASE_URL}/documents`;
 const UPLOADS_API = `${BASE_URL}/uploads`;
 
 export const api = {
@@ -165,7 +164,9 @@ export const api = {
     presetData?: Preset
   ): Promise<{ task_id: string; status: string; message: string }> {
     const endpoint =
-      action === "chunk" ? `${API_BASE}/chunk` : `${BASE_URL}/parse-tasks`;
+      action === "chunk"
+        ? `${BASE_URL}/chunk-tasks`
+        : `${BASE_URL}/parse-tasks`;
     let body: Record<string, unknown>;
     if (action === "chunk") {
       if (!presetData) {
@@ -287,7 +288,7 @@ export const api = {
   // --- Chunking Endpoints ---
 
   async getChunkTasks(): Promise<ChunkTaskResponse[]> {
-    const res = await fetch(`${API_BASE}/chunk-tasks`);
+    const res = await fetch(`${BASE_URL}/chunk-tasks`);
     if (!res.ok) {
       throw new Error(`Failed to fetch chunk tasks: ${res.statusText}`);
     }
@@ -295,7 +296,7 @@ export const api = {
   },
 
   async getChunkTaskResult(taskId: string): Promise<ChunkTaskResponse> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}`);
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch chunk task result: ${res.statusText}`);
     }
@@ -303,7 +304,7 @@ export const api = {
   },
 
   async deleteChunkTask(taskId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}`, {
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -314,7 +315,7 @@ export const api = {
   async cancelChunkTask(
     taskId: string
   ): Promise<{ task_id: string; status: string; message: string }> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}/cancel`, {
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}/cancel`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -324,7 +325,7 @@ export const api = {
   },
 
   async downloadChunks(taskId: string): Promise<Blob> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}/download`);
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}/download`);
     if (!res.ok) {
       throw new Error(`Failed to download chunks: ${res.statusText}`);
     }

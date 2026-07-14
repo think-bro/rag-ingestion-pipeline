@@ -24,7 +24,7 @@ dev-backend:
 
 # Fallback: Run worker locally without Docker
 dev-worker:
-	uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.parse_document.tasks --workers 1 --reload --reload-dir apps/backend
+	uv run --package backend taskiq worker apps.backend.app.core.broker:broker apps.backend.app.features.parse_document.tasks apps.backend.app.features.chunk_document.tasks --workers 1 --reload --reload-dir apps/backend
 
 # Recommended: Run frontend locally with HMR (Hot Module Replacement)
 dev-frontend:

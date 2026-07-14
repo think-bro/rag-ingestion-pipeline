@@ -17,7 +17,7 @@ from .tasks import chunk_task
 logger = structlog.get_logger()
 
 
-class ChunkingService:
+class ChunkDocumentService:
     def __init__(self, redis: Any):
         self.redis = redis
 

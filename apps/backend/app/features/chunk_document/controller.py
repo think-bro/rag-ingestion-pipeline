@@ -10,19 +10,19 @@ from .schemas import (
     ChunkTaskListDTO,
     TaskStatus,
 )
-from .service import ChunkingService
+from .service import ChunkDocumentService
 
 logger = structlog.get_logger()
 
 
-class ChunkingController(Controller):
-    path = "/documents"
+class ChunkDocumentController(Controller):
+    path = "/chunk-tasks"
 
-    @post(path="/chunk", status_code=202)
+    @post(status_code=202)
     async def chunk_document_endpoint(
         self,
         data: ChunkRequest,
-        chunking_service: ChunkingService,
+        chunk_document_service: ChunkDocumentService,
     ) -> ChunkTaskResponse:
         """Starts a background task to chunk a pre-uploaded markdown file."""
         logger.info(
@@ -32,7 +32,7 @@ class ChunkingController(Controller):
         )
 
         try:
-            task_id = await chunking_service.submit_chunk_task(request=data)
+            task_id = await chunk_document_service.submit_chunk_task(request=data)
         except ValueError as e:
             raise ClientException(str(e))
 
@@ -41,35 +41,35 @@ class ChunkingController(Controller):
             status=TaskStatus.PENDING,
         )
 
-    @get(path="/chunk-tasks/{task_id:str}")
+    @get(path="/{task_id:str}")
     async def get_chunk_task_status(
         self,
         task_id: str,
-        chunking_service: ChunkingService,
+        chunk_document_service: ChunkDocumentService,
     ) -> ChunkTaskResponse:
         """Retrieves the status and result of a document chunking task."""
-        result = await chunking_service.get_task_result(task_id)
+        result = await chunk_document_service.get_task_result(task_id)
         if not result:
             raise NotFoundException(f"Chunk task {task_id} not found")
 
         return result
 
-    @get(path="/chunk-tasks", return_dto=ChunkTaskListDTO)
+    @get(return_dto=ChunkTaskListDTO)
     async def get_chunk_tasks(
         self,
-        chunking_service: ChunkingService,
+        chunk_document_service: ChunkDocumentService,
     ) -> list[ChunkTaskResponse]:
         """Retrieves a list of all document chunking tasks."""
-        return await chunking_service.get_all_tasks()
+        return await chunk_document_service.get_all_tasks()
 
-    @post(path="/chunk-tasks/{task_id:str}/cancel", status_code=202)
+    @post(path="/{task_id:str}/cancel", status_code=202)
     async def cancel_chunk_task_endpoint(
         self,
         task_id: str,
-        chunking_service: ChunkingService,
+        chunk_document_service: ChunkDocumentService,
     ) -> ChunkTaskResponse:
         """Cancels an ongoing document chunking task."""
-        success = await chunking_service.cancel_task(task_id)
+        success = await chunk_document_service.cancel_task(task_id)
         if not success:
             raise ClientException(f"Chunk task {task_id} cannot be cancelled.")
 
@@ -78,14 +78,14 @@ class ChunkingController(Controller):
             status=TaskStatus.CANCELLING,
         )
 
-    @delete(path="/chunk-tasks/{task_id:str}", status_code=204)
+    @delete(path="/{task_id:str}", status_code=204)
     async def delete_chunk_task_endpoint(
         self,
         task_id: str,
-        chunking_service: ChunkingService,
+        chunk_document_service: ChunkDocumentService,
     ) -> None:
         """Deletes a document chunking task result."""
-        result = await chunking_service.get_task_result(task_id)
+        result = await chunk_document_service.get_task_result(task_id)
         if not result:
             raise NotFoundException(f"Chunk task {task_id} not found")
 
@@ -98,22 +98,22 @@ class ChunkingController(Controller):
                 f"Cannot delete a task in {result.status.value} state."
             )
 
-        await chunking_service.delete_task(task_id)
+        await chunk_document_service.delete_task(task_id)
 
-    @get(path="/chunk-tasks/{task_id:str}/download")
+    @get(path="/{task_id:str}/download")
     async def download_chunks_endpoint(
         self,
         task_id: str,
-        chunking_service: ChunkingService,
+        chunk_document_service: ChunkDocumentService,
     ) -> File:
         """Downloads the chunked output JSON."""
-        file_path = await chunking_service.download_chunks(task_id)
+        file_path = await chunk_document_service.download_chunks(task_id)
         if not file_path:
             raise NotFoundException(
                 f"Content for chunk task {task_id} not found or task not completed."
             )
 
-        result = await chunking_service.get_task_result(task_id)
+        result = await chunk_document_service.get_task_result(task_id)
         base_name = "document"
         if result and result.filename:
             base_name, _ = os.path.splitext(result.filename)

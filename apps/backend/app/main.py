@@ -16,8 +16,8 @@ from apps.backend.app.features.upload_document.controller import (
 from apps.backend.app.features.upload_document.service import UploadDocumentService
 from apps.backend.app.features.parse_document.controller import ParseDocumentController
 from apps.backend.app.features.parse_document.service import ParseDocumentService
-from apps.backend.app.features.document_chunking.controller import ChunkingController
-from apps.backend.app.features.document_chunking.service import ChunkingService
+from apps.backend.app.features.chunk_document.controller import ChunkDocumentController
+from apps.backend.app.features.chunk_document.service import ChunkDocumentService
 from apps.backend.app.features.get_presets.controller import GetPresetsController
 import redis.asyncio as aioredis
 
@@ -41,14 +41,14 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     app.state.parse_document_service = ParseDocumentService(
         redis=app.state.redis,
     )
-    app.state.chunking_service = ChunkingService(
+    app.state.chunk_document_service = ChunkDocumentService(
         redis=app.state.redis,
     )
     yield
 
     del app.state.upload_service
     del app.state.parse_document_service
-    del app.state.chunking_service
+    del app.state.chunk_document_service
 
     await app.state.redis_pool.disconnect()
     del app.state.redis
@@ -68,9 +68,9 @@ def provide_parse_document_service(state: State) -> ParseDocumentService:
     return state.parse_document_service
 
 
-def provide_chunking_service(state: State) -> ChunkingService:
-    """Dependency provider for ChunkingService using the global instance."""
-    return state.chunking_service
+def provide_chunk_document_service(state: State) -> ChunkDocumentService:
+    """Dependency provider for ChunkDocumentService using the global instance."""
+    return state.chunk_document_service
 
 
 def create_app() -> Litestar:
@@ -82,7 +82,7 @@ def create_app() -> Litestar:
         route_handlers=[
             UploadDocumentController,
             ParseDocumentController,
-            ChunkingController,
+            ChunkDocumentController,
             GetPresetsController,
         ],
     )
@@ -112,7 +112,9 @@ def create_app() -> Litestar:
             "parse_document_service": Provide(
                 provide_parse_document_service, sync_to_thread=False
             ),
-            "chunking_service": Provide(provide_chunking_service, sync_to_thread=False),
+            "chunk_document_service": Provide(
+                provide_chunk_document_service, sync_to_thread=False
+            ),
         },
         cors_config=cors_config,
         request_max_body_size=512
