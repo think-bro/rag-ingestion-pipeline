@@ -99,17 +99,19 @@ export type CombinedTask =
   | (ParseTaskResponse & { task_type: "parsing" })
   | (ChunkTaskResponse & { task_type: "chunking" });
 
-const API_BASE =
+const BASE_URL =
   process.env.NODE_ENV === "development"
-    ? "http://127.0.0.1:8000/api/v1/documents"
-    : "/api/v1/documents";
+    ? "http://127.0.0.1:8000/api/v1"
+    : "/api/v1";
+
+const UPLOADS_API = `${BASE_URL}/uploads`;
 
 export const api = {
   /**
    * Fetches the entire history of parsed documents (and pending/processing ones).
    */
   async getParseTasks(): Promise<ParseTaskResponse[]> {
-    const res = await fetch(`${API_BASE}/tasks`);
+    const res = await fetch(`${BASE_URL}/parse-tasks`);
     if (!res.ok) {
       throw new Error(`Failed to fetch tasks: ${res.statusText}`);
     }
@@ -123,7 +125,7 @@ export const api = {
     const formData = new FormData();
     formData.append("data", file);
 
-    const res = await fetch(`${API_BASE}/uploads`, {
+    const res = await fetch(UPLOADS_API, {
       method: "POST",
       body: formData,
     });
@@ -137,7 +139,7 @@ export const api = {
    * Deletes a pre-uploaded document.
    */
   async deleteUpload(fileId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/uploads/${fileId}`, {
+    const res = await fetch(`${UPLOADS_API}/${fileId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -146,7 +148,7 @@ export const api = {
   },
 
   async getPresets(): Promise<PresetsResponse> {
-    const res = await fetch(`${API_BASE}/presets`);
+    const res = await fetch(`${BASE_URL}/presets`);
     if (!res.ok) {
       throw new Error(`Failed to fetch presets: ${res.statusText}`);
     }
@@ -162,7 +164,9 @@ export const api = {
     presetData?: Preset
   ): Promise<{ task_id: string; status: string; message: string }> {
     const endpoint =
-      action === "chunk" ? `${API_BASE}/chunk` : `${API_BASE}/parse`;
+      action === "chunk"
+        ? `${BASE_URL}/chunk-tasks`
+        : `${BASE_URL}/parse-tasks`;
     let body: Record<string, unknown>;
     if (action === "chunk") {
       if (!presetData) {
@@ -204,7 +208,7 @@ export const api = {
    * Gets details for a specific task (including large content payload).
    */
   async getParseTaskResult(taskId: string): Promise<ParseTaskResponse> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}`);
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch task result: ${res.statusText}`);
     }
@@ -215,7 +219,7 @@ export const api = {
    * Deletes a task result.
    */
   async deleteParseTask(taskId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -229,7 +233,7 @@ export const api = {
   async cancelParseTask(
     taskId: string
   ): Promise<{ task_id: string; status: string; message: string }> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}/cancel`, {
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}/cancel`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -246,7 +250,7 @@ export const api = {
     partIndex: number
   ): Promise<{ task_id: string; status: string; message: string }> {
     const res = await fetch(
-      `${API_BASE}/tasks/${taskId}/parts/${partIndex}/retry`,
+      `${BASE_URL}/parse-tasks/${taskId}/parts/${partIndex}/retry`,
       {
         method: "POST",
       }
@@ -262,7 +266,7 @@ export const api = {
    */
   async downloadPartContent(taskId: string, partIndex: number): Promise<Blob> {
     const res = await fetch(
-      `${API_BASE}/tasks/${taskId}/parts/${partIndex}/download`
+      `${BASE_URL}/parse-tasks/${taskId}/parts/${partIndex}/download`
     );
     if (!res.ok) {
       throw new Error(`Failed to download part: ${res.statusText}`);
@@ -274,7 +278,7 @@ export const api = {
    * Downloads the merged markdown content for the entire task.
    */
   async downloadParseFullContent(taskId: string): Promise<Blob> {
-    const res = await fetch(`${API_BASE}/tasks/${taskId}/download`);
+    const res = await fetch(`${BASE_URL}/parse-tasks/${taskId}/download`);
     if (!res.ok) {
       throw new Error(`Failed to download full content: ${res.statusText}`);
     }
@@ -284,7 +288,7 @@ export const api = {
   // --- Chunking Endpoints ---
 
   async getChunkTasks(): Promise<ChunkTaskResponse[]> {
-    const res = await fetch(`${API_BASE}/chunk-tasks`);
+    const res = await fetch(`${BASE_URL}/chunk-tasks`);
     if (!res.ok) {
       throw new Error(`Failed to fetch chunk tasks: ${res.statusText}`);
     }
@@ -292,7 +296,7 @@ export const api = {
   },
 
   async getChunkTaskResult(taskId: string): Promise<ChunkTaskResponse> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}`);
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch chunk task result: ${res.statusText}`);
     }
@@ -300,7 +304,7 @@ export const api = {
   },
 
   async deleteChunkTask(taskId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}`, {
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}`, {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -311,7 +315,7 @@ export const api = {
   async cancelChunkTask(
     taskId: string
   ): Promise<{ task_id: string; status: string; message: string }> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}/cancel`, {
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}/cancel`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -321,7 +325,7 @@ export const api = {
   },
 
   async downloadChunks(taskId: string): Promise<Blob> {
-    const res = await fetch(`${API_BASE}/chunk-tasks/${taskId}/download`);
+    const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}/download`);
     if (!res.ok) {
       throw new Error(`Failed to download chunks: ${res.statusText}`);
     }

@@ -5,7 +5,6 @@ import json
 import structlog
 from anyio import Path
 
-from apps.backend.app.core.presets import CHUNK_PRESETS
 from apps.backend.app.core.config import (
     UPLOAD_DIR,
     CHUNKS_DIR,
@@ -18,13 +17,9 @@ from .tasks import chunk_task
 logger = structlog.get_logger()
 
 
-class ChunkingService:
+class ChunkDocumentService:
     def __init__(self, redis: Any):
         self.redis = redis
-
-    async def get_presets(self) -> dict[str, Any]:
-        """Returns the chunking configuration presets."""
-        return CHUNK_PRESETS
 
     async def submit_chunk_task(self, request: ChunkRequest) -> str:
         """Saves task info to Redis and submits background chunking task."""

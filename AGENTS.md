@@ -29,16 +29,19 @@ apps/
 │   │   │   ├── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
 │   │   │   └── presets.py           # Chunk configuration presets
 │   │   └── features/
-│   │       ├── document_chunking/   # Hierarchical and recursive chunking
+│   │       ├── upload_document/     # File uploads
+│   │       ├── get_presets/         # Chunking presets
+│   │       ├── chunk_document/      # Hierarchical and recursive chunking
 │   │       │   ├── controller.py    # HTTP endpoints
 │   │       │   ├── service.py       # Task submission
 │   │       │   ├── schemas.py       # Pydantic chunk models
 │   │       │   ├── tasks.py         # TaskIQ background tasks
 │   │       │   └── chunk_worker.py  # Subprocess for tokenizer & chunker
-│   │       └── document_parsing/
+│   │       └── parse_document/
 │   │           ├── controller.py    # HTTP endpoints (parse, tasks, delete)
 │   │           ├── service.py       # Business logic, file I/O, task submission
 │   │           ├── schemas.py       # Pydantic models, DTOs, enums
+│   │           ├── parse_worker.py  # Subprocess for Docling
 │   │           └── tasks.py         # TaskIQ background task definition
 │   ├── pyproject.toml
 │   └── Dockerfile
@@ -271,14 +274,14 @@ The backend API uses URL path versioning (e.g., `/api/v1/`).
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
 1. **Upload Phase**: `POST /api/v1/documents/uploads` endpoint accepts a multipart file (up to 512MB), saves it to `/storage/uploads/`, extracts metadata (e.g., page count), and returns `file_id`.
-2. **Task Initialization**: Users select either parsing (`POST /api/v1/documents/parse`) or chunking (`POST /api/v1/documents/chunk`). The endpoint splits the PDF into smaller parts in `/storage/parts/` (for parsing) or loads the uploaded Markdown file (for chunking). It writes a master `PENDING` state to Redis, enqueues parallel TaskIQ background tasks, and returns a `task_id`.
+2. **Task Initialization**: Users select either parsing (`POST /api/v1/parse-tasks`) or chunking (`POST /api/v1/chunk-tasks`). The endpoint splits the PDF into smaller parts in `/storage/parts/` (for parsing) or loads the uploaded Markdown file (for chunking). It writes a master `PENDING` state to Redis, enqueues parallel TaskIQ background tasks, and returns a `task_id`.
 3. **Parallel Processing**: The actual processing is executed by background `worker` processes. Each worker handles a specific part. To prevent Out-Of-Memory (OOM) errors and allow parallelization, workers process smaller PDF parts.
 4. **Subprocess Isolation**: To support graceful cancellation and prevent memory leaks, CPU-intensive and ML-heavy work is isolated into a separate OS subprocess (`parse_worker.py` for Docling, `chunk_worker.py` for Chonkie/LangChain). The TaskIQ worker runs an asynchronous polling loop to monitor the subprocess and a cancellation flag in Redis.
-5. **Cancellation**: If a user cancels the master task (`POST /api/v1/documents/tasks/{task_id}/cancel`), a flag is written to Redis. Workers detect this, send a `SIGTERM` to their subprocesses to kill them gracefully, and update the part state to the `cancelled_set`.
+5. **Cancellation**: If a user cancels the master task (`POST /api/v1/parse-tasks/{task_id}/cancel` or `/api/v1/chunk-tasks/{task_id}/cancel`), a flag is written to Redis. Workers detect this, send a `SIGTERM` to their subprocesses to kill them gracefully, and update the part state to the `cancelled_set`.
 6. **IPC Communication**: The subprocess communicates back to the parent worker using a temporary JSON file (IPC) to avoid `stdout` pipe deadlocks with massive Markdown outputs.
 7. **State Management**: The worker adds the part index to specific Redis Sets (`completed_set`, `failed_set`, or `cancelled_set`) and writes the result to disk as `.md` or `.json` files (`/storage/results/{task_id}_part_{index}.ext`). The master task status only evaluates to `FAILED` or `COMPLETED` when all parts are finished.
-8. **Retry Mechanism**: If a part fails, users can retry it via `POST /api/v1/documents/tasks/{task_id}/parts/{part_index}/retry`. This removes the part from `failed_set`, updates its status to `PROCESSING`, and re-enqueues the `part_task`.
-9. **Data Retrieval**: `GET /api/v1/documents/tasks/{task_id}` reads the master state and all part states from Redis sets. `GET /api/v1/documents/tasks/{task_id}/download` triggers the backend to dynamically merge all completed part files into a single `_merged.md` or `_merged.json` file and serves it to the user.
+8. **Retry Mechanism**: If a part fails, users can retry it via `POST /api/v1/parse-tasks/{task_id}/parts/{part_index}/retry` (or `/chunk-tasks/`). This removes the part from `failed_set`, updates its status to `PROCESSING`, and re-enqueues the `part_task`.
+9. **Data Retrieval**: `GET /api/v1/parse-tasks/{task_id}` reads the master state and all part states from Redis sets. `GET /api/v1/parse-tasks/{task_id}/download` triggers the backend to dynamically merge all completed part files into a single `_merged.md` or `_merged.json` file and serves it to the user. (Similar structure applies to chunk-tasks).
 10. **Frontend Polling**: The frontend uses **adaptive polling** (2s when active/cancelling, 10s when idle) via TanStack Query's `refetchInterval` to keep the UI in sync with the multi-part progress.
 11. **Reliability**: The `RedisStreamBroker` guarantees at-least-once delivery, so part tasks aren't lost if a worker crashes.
 12. **Cleanup**: A background cron task (`cleanup_orphaned_uploads_task`) runs hourly to delete uploaded files that were abandoned before parsing (older than 24 hours).
@@ -286,8 +289,8 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 **Important Files:**
 - `apps/backend/app/core/broker.py`: Centralized definition for the TaskIQ broker and result backend.
 - `apps/backend/app/core/config.py`: Storage path configuration (`UPLOAD_DIR`, `RESULTS_DIR`).
-- `apps/backend/app/features/document_parsing/tasks.py`: Contains parsing TaskIQ tasks (`@broker.task()`).
-- `apps/backend/app/features/document_chunking/tasks.py`: Contains chunking TaskIQ tasks (`@broker.task()`).
+- `apps/backend/app/features/parse_document/tasks.py`: Contains parsing TaskIQ tasks (`@broker.task()`).
+- `apps/backend/app/features/chunk_document/tasks.py`: Contains chunking TaskIQ tasks (`@broker.task()`).
 
 ### Singleton Services
 
@@ -310,8 +313,8 @@ Heavy resources like `DocumentConverter` (which loads ML models) are initialized
 
 - Commit messages follow **[Conventional Commits](https://www.conventionalcommits.org/)**: `<type>(<scope>): <description>`
 - Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`
-- Scope matches the feature or area: `backend`, `frontend`, `root`, `document_parsing`, `core`
-- Example: `feat(document_parsing): Add PDF parsing support`
+- Scope matches the feature or area: `backend`, `frontend`, `root`, `parse_document`, `core`
+- Example: `feat(parse_document): Add PDF parsing support`
 
 This repository uses **Google Release Please** for automated semantic versioning based on commits.
 - **Do NOT** manually bump versions in `pyproject.toml`, `package.json`, or `uv.lock`.

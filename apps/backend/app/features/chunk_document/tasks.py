@@ -16,7 +16,7 @@ from apps.backend.app.core.config import (
     SUBPROCESS_POLL_INTERVAL,
     SUBPROCESS_TERMINATE_TIMEOUT,
 )
-from apps.backend.app.features.document_chunking.schemas import TaskStatus
+from apps.backend.app.features.chunk_document.schemas import TaskStatus
 
 logger = structlog.get_logger()
 
@@ -59,7 +59,7 @@ async def chunk_task(
             "python",
             "-B",
             "-m",
-            "apps.backend.app.features.document_chunking.chunk_worker",
+            "apps.backend.app.features.chunk_document.chunk_worker",
             file_path,
             config_json,
             output_json_path,

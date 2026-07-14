@@ -18,7 +18,7 @@ from apps.backend.app.core.config import (
     SUBPROCESS_POLL_INTERVAL,
     SUBPROCESS_TERMINATE_TIMEOUT,
 )
-from apps.backend.app.features.document_parsing.schemas import TaskStatus, PartStatus
+from apps.backend.app.features.parse_document.schemas import TaskStatus, PartStatus
 
 
 logger = structlog.get_logger()
@@ -93,7 +93,7 @@ async def parse_part_task(
         process = await asyncio.create_subprocess_exec(
             "python",
             "-m",
-            "apps.backend.app.features.document_parsing.parse_worker",
+            "apps.backend.app.features.parse_document.parse_worker",
             part_file_path,
             output_format,
             output_json_path,
