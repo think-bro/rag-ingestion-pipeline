@@ -18,6 +18,8 @@ from apps.backend.app.features.parse_document.controller import ParseDocumentCon
 from apps.backend.app.features.parse_document.service import ParseDocumentService
 from apps.backend.app.features.chunk_document.controller import ChunkDocumentController
 from apps.backend.app.features.chunk_document.service import ChunkDocumentService
+from apps.backend.app.features.embed_document.controller import EmbedDocumentController
+from apps.backend.app.features.embed_document.service import EmbedDocumentService
 from apps.backend.app.features.get_presets.controller import GetPresetsController
 import redis.asyncio as aioredis
 
@@ -44,11 +46,15 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     app.state.chunk_document_service = ChunkDocumentService(
         redis=app.state.redis,
     )
+    app.state.embed_document_service = EmbedDocumentService(
+        redis=app.state.redis,
+    )
     yield
 
     del app.state.upload_service
     del app.state.parse_document_service
     del app.state.chunk_document_service
+    del app.state.embed_document_service
 
     await app.state.redis_pool.disconnect()
     del app.state.redis
@@ -73,6 +79,11 @@ def provide_chunk_document_service(state: State) -> ChunkDocumentService:
     return state.chunk_document_service
 
 
+def provide_embed_document_service(state: State) -> EmbedDocumentService:
+    """Dependency provider for EmbedDocumentService using the global instance."""
+    return state.embed_document_service
+
+
 def create_app() -> Litestar:
     """Application factory function."""
     cors_config = CORSConfig(allow_origins=["*"])
@@ -84,6 +95,7 @@ def create_app() -> Litestar:
             ParseDocumentController,
             ChunkDocumentController,
             GetPresetsController,
+            EmbedDocumentController,
         ],
     )
     api_router = Router(path="/api", route_handlers=[v1_router])
@@ -114,6 +126,9 @@ def create_app() -> Litestar:
             ),
             "chunk_document_service": Provide(
                 provide_chunk_document_service, sync_to_thread=False
+            ),
+            "embed_document_service": Provide(
+                provide_embed_document_service, sync_to_thread=False
             ),
         },
         cors_config=cors_config,

@@ -1,0 +1,1 @@
+"""Document embedding feature slice."""
