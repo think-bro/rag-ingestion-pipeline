@@ -148,7 +148,7 @@ def main() -> None:
         preview_data = {
             "total_chunks": len(result),
             "config": config,
-            "chunks": preview_items,
+            "items": preview_items,
         }
 
         with open(args.preview_json_path, "w", encoding="utf-8") as f:

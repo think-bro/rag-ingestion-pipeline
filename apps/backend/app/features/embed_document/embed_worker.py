@@ -52,7 +52,7 @@ def main():
         # Prepare texts
         texts = [c.get("contextualized_text", c.get("text", "")) for c in chunks]
 
-        embeddings_generator = embedding_model.embed(texts)
+        embeddings_generator = embedding_model.embed(texts, batch_size=8)
         embeddings_list = list(embeddings_generator)
 
         # Build pyarrow table

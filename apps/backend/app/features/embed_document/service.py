@@ -11,7 +11,13 @@ from apps.backend.app.core.config import (
     CANCEL_KEY_PREFIX,
     CANCEL_KEY_TTL,
 )
-from .schemas import EmbedRequest, TaskStatus, EmbedTaskResponse, ChunkItem, EmbedConfig
+from .schemas import (
+    EmbedRequest,
+    TaskStatus,
+    EmbedTaskResponse,
+    EmbedItem,
+    EmbedConfig,
+)
 from .tasks import embed_task
 
 logger = structlog.get_logger()
@@ -90,7 +96,7 @@ class EmbedDocumentService:
                 with open(preview_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     if "items" in data:
-                        response.items = [ChunkItem(**c) for c in data["items"]]
+                        response.items = [EmbedItem(**c) for c in data["items"]]
 
         return response
 

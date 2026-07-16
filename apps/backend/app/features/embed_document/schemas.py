@@ -21,10 +21,8 @@ class EmbedConfig(BaseModel):
     model_name: str = Field(default="intfloat/multilingual-e5-large")
 
 
-class ChunkItem(BaseModel):
+class EmbedItem(BaseModel):
     chunk_id: str
-    text: Optional[str] = None
-    contextualized_text: Optional[str] = None
     metadata: dict[str, Any]
 
 
@@ -44,7 +42,7 @@ class EmbedTaskResponse(BaseModel):
     file_size: Optional[int] = None
     total_vectors: Optional[int] = None
     config: Optional[EmbedConfig] = None
-    items: Optional[list[ChunkItem]] = None
+    items: Optional[list[EmbedItem]] = None
 
 
 class EmbedTaskListDTO(PydanticDTO[EmbedTaskResponse]):

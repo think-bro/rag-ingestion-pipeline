@@ -17,7 +17,7 @@ from apps.backend.app.core.config import (
     PAGES_PER_PART,
 )
 from .schemas import (
-    TaskResultResponse,
+    ParseTaskResponse,
     TaskStatus,
     ParseRequest,
     PartStatus,
@@ -161,7 +161,7 @@ class ParseDocumentService:
 
         return task_id
 
-    async def get_task_result(self, task_id: str) -> TaskResultResponse | None:
+    async def get_task_result(self, task_id: str) -> ParseTaskResponse | None:
         """Fetches the master task result and its parts from Redis."""
         task_data = await self.redis.hgetall(f"task:{task_id}")
 
@@ -196,11 +196,11 @@ class ParseDocumentService:
                     p["processing_time"] = float(p["processing_time"])
                 parts.append(PartResponse(**p))
 
-        response = TaskResultResponse(**task_data)
-        response.parts = parts
+        response = ParseTaskResponse(**task_data)
+        response.items = parts if parts else None
         return response
 
-    async def get_all_tasks(self) -> list[TaskResultResponse]:
+    async def get_all_tasks(self) -> list[ParseTaskResponse]:
         """Lists all tasks from Redis."""
         keys = await self.redis.keys("task:*")
         # Filter out part keys and set keys
@@ -224,7 +224,7 @@ class ParseDocumentService:
             for key in ["page_count", "file_size", "total_parts", "completed_parts"]:
                 if key in data:
                     data[key] = int(data[key])
-            tasks.append(TaskResultResponse(**data))
+            tasks.append(ParseTaskResponse(**data))
 
         # Sort tasks by created_at descending (newest first)
         tasks.sort(

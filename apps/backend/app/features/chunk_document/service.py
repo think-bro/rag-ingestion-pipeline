@@ -91,8 +91,8 @@ class ChunkDocumentService:
             if await Path(preview_path).exists():
                 with open(preview_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    if "chunks" in data:
-                        response.chunks = [ChunkItem(**c) for c in data["chunks"]]
+                    if "items" in data:
+                        response.items = [ChunkItem(**c) for c in data["items"]]
 
         return response
 
