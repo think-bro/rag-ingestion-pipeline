@@ -29,7 +29,10 @@ import { useTaskStore } from "@/store/task-store";
 
 interface TaskItemProps {
   isMobile: boolean;
-  onSelectTask: (id: string, type: "parsing" | "chunking") => void;
+  onSelectTask: (
+    id: string,
+    type: "parsing" | "chunking" | "embedding"
+  ) => void;
   task: CombinedTask;
 }
 

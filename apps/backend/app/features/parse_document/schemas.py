@@ -49,8 +49,9 @@ class PartResponse(BaseModel):
     error: Optional[str] = None
 
 
-class TaskResultResponse(BaseModel):
+class ParseTaskResponse(BaseModel):
     task_id: str
+    task_type: str = "parsing"
     status: TaskStatus
     filename: Optional[str] = None
     output_format: Optional[OutputFormat] = None
@@ -61,13 +62,14 @@ class TaskResultResponse(BaseModel):
     file_size: Optional[int] = None
     total_parts: Optional[int] = None
     completed_parts: Optional[int] = None
-    parts: Optional[list[PartResponse]] = None
+    items: Optional[list[PartResponse]] = None
 
 
-class TaskListDTO(PydanticDTO[TaskResultResponse]):
+class ParseTaskListDTO(PydanticDTO[ParseTaskResponse]):
     config = DTOConfig(
         include={
             "task_id",
+            "task_type",
             "status",
             "filename",
             "created_at",

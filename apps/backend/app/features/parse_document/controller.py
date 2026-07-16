@@ -6,9 +6,9 @@ from litestar.response import File
 
 from .schemas import (
     TaskResponse,
-    TaskResultResponse,
+    ParseTaskResponse,
     TaskStatus,
-    TaskListDTO,
+    ParseTaskListDTO,
     ParseRequest,
 )
 from .service import ParseDocumentService
@@ -53,7 +53,7 @@ class ParseDocumentController(Controller):
         self,
         task_id: str,
         parse_document_service: ParseDocumentService,
-    ) -> TaskResultResponse:
+    ) -> ParseTaskResponse:
         """
         Retrieves the status and result of a document parsing task.
         """
@@ -63,11 +63,11 @@ class ParseDocumentController(Controller):
 
         return result
 
-    @get(return_dto=TaskListDTO)
+    @get(return_dto=ParseTaskListDTO)
     async def get_tasks(
         self,
         parse_document_service: ParseDocumentService,
-    ) -> list[TaskResultResponse]:
+    ) -> list[ParseTaskResponse]:
         """
         Retrieves a list of all document parsing tasks.
         """

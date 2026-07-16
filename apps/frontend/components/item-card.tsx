@@ -7,13 +7,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useRetryPart } from "@/hooks/use-tasks";
-import type { ChunkItem, PartResponse } from "@/lib/api";
+import { useRetryPart } from "@/hooks/use-parsing-tasks";
+import type { ChunkItem, EmbedItem, PartResponse } from "@/lib/api";
 import { formatProcessingTime } from "@/lib/utils";
 
 export type ItemCardProps =
   | { type: "parse"; item: PartResponse; taskId: string }
-  | { type: "chunk"; item: ChunkItem };
+  | { type: "chunk"; item: ChunkItem }
+  | { type: "embed"; item: EmbedItem };
 
 export function ItemCard(props: ItemCardProps) {
   // const downloadMutation = useDownloadPart();
@@ -36,7 +37,7 @@ export function ItemCard(props: ItemCardProps) {
     <Card className="group shadow-sm">
       <div className="flex flex-row items-center justify-between px-4">
         <div className="flex flex-row gap-6">
-          {props.type === "parse" ? (
+          {props.type === "parse" && (
             <>
               <span className="font-semibold text-sm">
                 Part #{String(props.item.part_index + 1).padStart(3, "0")}
@@ -52,7 +53,9 @@ export function ItemCard(props: ItemCardProps) {
                   )}
               </span>
             </>
-          ) : (
+          )}
+
+          {props.type === "chunk" && (
             <>
               <span className="font-semibold text-sm">
                 Chunk #
@@ -64,11 +67,25 @@ export function ItemCard(props: ItemCardProps) {
               </span>
             </>
           )}
+
+          {props.type === "embed" && (
+            <>
+              <span className="font-semibold text-sm">
+                Vector #
+                {String(props.item.metadata.chunk_index + 1).padStart(3, "0")}
+              </span>
+              <span className="text-muted-foreground text-sm">
+                Source ID: {props.item.chunk_id}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center">
           {props.type === "parse" && <StatusBadge status={props.item.status} />}
-          {props.type === "chunk" && <StatusBadge status={"completed"} />}
+          {(props.type === "chunk" || props.type === "embed") && (
+            <StatusBadge status={"completed"} />
+          )}
 
           {props.type === "parse" && props.item.status === "failed" && (
             <div className="flex w-0 items-center justify-end overflow-hidden opacity-0 transition-all duration-300 group-hover:ml-2 group-hover:w-8 group-hover:opacity-100">

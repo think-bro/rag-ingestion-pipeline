@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("file_path", help="Path to the markdown document to chunk")
     parser.add_argument("config_json", help="JSON serialized ChunkConfig")
     parser.add_argument("output_json_path", help="Path to save the result JSON")
+    parser.add_argument("preview_json_path", help="Path to save the preview JSON")
     parser.add_argument("source_filename", help="Original filename of the document")
     args = parser.parse_args()
 
@@ -133,6 +134,25 @@ def main() -> None:
 
         with open(args.output_json_path, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
+
+        # Generate preview JSON (max 50 items)
+        preview_items = []
+        for i, c in enumerate(result[:50]):
+            preview_items.append(
+                {
+                    "chunk_id": c.get("chunk_id", ""),
+                    "metadata": c.get("metadata", {}),
+                }
+            )
+
+        preview_data = {
+            "total_chunks": len(result),
+            "config": config,
+            "items": preview_items,
+        }
+
+        with open(args.preview_json_path, "w", encoding="utf-8") as f:
+            json.dump(preview_data, f)
 
         sys.exit(0)
 

@@ -8,11 +8,13 @@ BASE_DIR = Path(WORKSPACE_DIR) if WORKSPACE_DIR else Path.cwd()
 STORAGE_DIR = BASE_DIR / "storage"
 UPLOAD_DIR = STORAGE_DIR / "uploads"
 RESULTS_DIR = STORAGE_DIR / "results"
+CHUNKS_DIR = STORAGE_DIR / "chunks"
+EMBEDDINGS_DIR = STORAGE_DIR / "embeddings"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-CHUNKS_DIR = STORAGE_DIR / "chunks"
 CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
+EMBEDDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Task Cancellation Constants
 CANCEL_KEY_PREFIX = "cancel_task:"

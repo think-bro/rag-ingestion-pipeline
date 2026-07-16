@@ -31,7 +31,7 @@ export function NewIngestionModal() {
     hasFiles: false,
     isUploading: false,
     isSubmitting: false,
-    taskType: "unselected" as "unselected" | "parse" | "chunk",
+    taskType: "unselected" as "unselected" | "parse" | "chunk" | "embed",
     preset: "unselected" as string,
   });
 

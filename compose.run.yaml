@@ -12,6 +12,7 @@ services:
       taskiq worker apps.backend.app.core.broker:broker
       apps.backend.app.features.parse_document.tasks
       apps.backend.app.features.chunk_document.tasks
+      apps.backend.app.features.embed_document.tasks
       --workers 2 --max-async-tasks 1 --max-prefetch 1
 
   frontend:

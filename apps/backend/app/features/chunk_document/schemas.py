@@ -36,8 +36,8 @@ class ChunkConfig(BaseModel):
 
 class ChunkItem(BaseModel):
     chunk_id: str
-    text: str
-    contextualized_text: str
+    text: Optional[str] = None
+    contextualized_text: Optional[str] = None
     metadata: dict[str, Any]
 
 
@@ -58,7 +58,7 @@ class ChunkTaskResponse(BaseModel):
     file_size: Optional[int] = None
     total_chunks: Optional[int] = None
     config: Optional[ChunkConfig] = None
-    chunks: Optional[list[ChunkItem]] = None
+    items: Optional[list[ChunkItem]] = None
 
 
 class ChunkTaskListDTO(PydanticDTO[ChunkTaskResponse]):
