@@ -8,7 +8,7 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 **Pipeline Stages:**
 1. **Parsing:** Extracts structured content from raw documents using Docling. Outputs structured Markdown.
 2. **Chunking:** Splits the parsed document into hierarchical and token-aware recursive chunks using LangChain and Chonkie. Outputs flattened JSON ready for vector ingestion.
-3. **Embedding (Planned):** Generating vector embeddings for each chunk.
+3. **Embedding:** Generating vector embeddings for chunks using FastEmbed, saving output as Parquet.
 4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
 
 ## Tech Stack
@@ -18,6 +18,7 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 - **Task Queue:** [TaskIQ](https://github.com/taskiq-python/taskiq) with [Redis](https://github.com/redis/redis/)
 - **Document Parsing:** [Docling](https://github.com/docling-project/docling)
 - **Document Chunking:** [Chonkie](https://github.com/feyninc/chonkie) and [LangChain](https://github.com/langchain-ai/langchain)
+- **Vector Embedding:** [FastEmbed](https://github.com/qdrant/fastembed) and [PyArrow](https://github.com/apache/arrow)
 - **State Management:** [Zustand](https://github.com/pmndrs/zustand), [TanStack Query](https://github.com/TanStack/query)
 - **Containerization:** [Docker](https://www.docker.com/)
 - **Backend Package Management:** [uv](https://github.com/astral-sh/uv)
