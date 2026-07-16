@@ -25,6 +25,7 @@ const TASK_OPTIONS = [
   { label: "Select a Task", value: "unselected" },
   { label: "Parsing", value: "parse" },
   { label: "Chunking", value: "chunk" },
+  { label: "Embedding", value: "embed" },
 ] as const;
 
 function getErrorMessage(
@@ -48,12 +49,19 @@ function getErrorMessage(
     return "Invalid file. Please ensure it is a Markdown (.md) file.";
   }
 
+  if (taskType === "embed") {
+    return "Invalid file. Please ensure it is a JSON (.json) file.";
+  }
+
   return "Invalid file. Please ensure it is a PDF under 512MB.";
 }
 
 function getAcceptedFiles(
   taskType: string
 ): Record<string, string[]> | undefined {
+  if (taskType === "embed") {
+    return { "application/json": [".json"] };
+  }
   if (taskType === "chunk") {
     return { "text/markdown": [".md"] };
   }
@@ -74,7 +82,7 @@ export function NewIngestionForm({
     hasFiles: boolean;
     isUploading: boolean;
     isSubmitting: boolean;
-    taskType: "unselected" | "parse" | "chunk";
+    taskType: "unselected" | "parse" | "chunk" | "embed";
     preset: string;
   }) => void;
 }) {
@@ -83,9 +91,9 @@ export function NewIngestionForm({
   const { data: CHUNK_PRESETS, isLoading: isLoadingPresets } = usePresets();
   const { setActiveTask, setNewIngestionModalOpen } = useTaskStore();
 
-  const [taskType, setTaskType] = useState<"unselected" | "parse" | "chunk">(
-    "unselected"
-  );
+  const [taskType, setTaskType] = useState<
+    "unselected" | "parse" | "chunk" | "embed"
+  >("unselected");
   const [preset, setPreset] = useState("unselected");
   const [format, _setFormat] = useState("text");
   const [customMetadata, setCustomMetadata] = useState<Record<string, string>>(
@@ -193,7 +201,7 @@ export function NewIngestionForm({
         <div className="col-span-full sm:col-span-3">
           <Select
             disabled={isFormPending}
-            onValueChange={(v: "unselected" | "parse" | "chunk") =>
+            onValueChange={(v: "unselected" | "parse" | "chunk" | "embed") =>
               setTaskType(v)
             }
             value={taskType}
@@ -313,6 +321,9 @@ export function NewIngestionForm({
                   }
                   if (taskType === "chunk") {
                     return "Markdown documents up to 100MB";
+                  }
+                  if (taskType === "embed") {
+                    return "JSON documents up to 100MB";
                   }
                   return "PDF documents up to 100MB";
                 })()}

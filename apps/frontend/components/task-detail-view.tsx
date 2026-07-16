@@ -8,29 +8,29 @@ import {
 } from "lucide-react";
 import { ItemCard } from "@/components/item-card";
 import { StateCard } from "@/components/state-card";
-import { StatusBadge } from "@/components/status-badge";
+import { TaskMasterCard } from "@/components/task-master-card";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
+  useChunkingTaskDetailData,
   useDownloadChunkFull,
+} from "@/hooks/use-chunking-tasks";
+import {
+  useDownloadEmbedFull,
+  useEmbeddingTaskDetailData,
+} from "@/hooks/use-embedding-tasks";
+import {
   useDownloadParseFull,
-  useTaskDetailData,
-} from "@/hooks/use-tasks";
+  useParsingTaskDetailData,
+} from "@/hooks/use-parsing-tasks";
 import type {
   ChunkItem,
   ChunkTaskResponse,
+  EmbedItem,
+  EmbedTaskResponse,
   ParseTaskResponse,
   PartResponse,
 } from "@/lib/api";
-import { formatProcessingTime } from "@/lib/utils";
 import { useTaskStore } from "@/store/task-store";
 
 function TaskLoadingState({
@@ -84,8 +84,32 @@ export function TaskDetailView({
   taskType = "parsing",
 }: {
   taskId: string;
-  taskType?: "parsing" | "chunking";
+  taskType?: "parsing" | "chunking" | "embedding";
 }) {
+  const isParsingTask = taskType === "parsing";
+  const isChunkingTask = taskType === "chunking";
+  const isEmbeddingTask = taskType === "embedding";
+
+  const parsingDetail = useParsingTaskDetailData(isParsingTask ? taskId : null);
+  const chunkingDetail = useChunkingTaskDetailData(
+    isChunkingTask ? taskId : null
+  );
+  const embeddingDetail = useEmbeddingTaskDetailData(
+    isEmbeddingTask ? taskId : null
+  );
+
+  let detail:
+    | ReturnType<typeof useParsingTaskDetailData>
+    | ReturnType<typeof useChunkingTaskDetailData>
+    | ReturnType<typeof useEmbeddingTaskDetailData>;
+  if (isParsingTask) {
+    detail = parsingDetail;
+  } else if (isEmbeddingTask) {
+    detail = embeddingDetail;
+  } else {
+    detail = chunkingDetail;
+  }
+
   const {
     isParsing,
     isLoading,
@@ -99,11 +123,12 @@ export function TaskDetailView({
     failed,
     cancelled,
     items,
-  } = useTaskDetailData(taskId, taskType);
+  } = detail;
 
   const { setActiveTask } = useTaskStore();
   const downloadParseMutation = useDownloadParseFull();
   const downloadChunksMutation = useDownloadChunkFull();
+  const downloadEmbedMutation = useDownloadEmbedFull();
 
   if (isLoading) {
     return <TaskLoadingState title="Loading task details..." />;
@@ -118,19 +143,42 @@ export function TaskDetailView({
     );
   }
 
-  const data = rawData as ParseTaskResponse & ChunkTaskResponse;
+  const data = rawData as Omit<ParseTaskResponse, "task_type"> &
+    Omit<ChunkTaskResponse, "task_type"> &
+    Omit<EmbedTaskResponse, "task_type">;
+  const isEmbedding = taskType === "embedding";
 
   const handleDownloadFull = () => {
     if (isParsing) {
       downloadParseMutation.mutate(taskId);
+    } else if (isEmbedding) {
+      downloadEmbedMutation.mutate(taskId);
     } else {
       downloadChunksMutation.mutate(taskId);
     }
   };
 
-  const isDownloading = isParsing
-    ? downloadParseMutation.isPending
-    : downloadChunksMutation.isPending;
+  let isDownloading = false;
+  if (isParsing) {
+    isDownloading = downloadParseMutation.isPending;
+  } else if (isEmbedding) {
+    isDownloading = downloadEmbedMutation.isPending;
+  } else {
+    isDownloading = downloadChunksMutation.isPending;
+  }
+
+  let itemTerm = "Chunks";
+  let itemTermLower = "chunks";
+  let downloadLabel = "Download as JSON";
+  if (isParsing) {
+    itemTerm = "Parts";
+    itemTermLower = "parts";
+    downloadLabel = "Download as MARKDOWN";
+  } else if (isEmbedding) {
+    itemTerm = "Vectors";
+    itemTermLower = "vectors";
+    downloadLabel = "Download as PARQUET";
+  }
 
   const isTaskProcessing = ["pending", "processing", "cancelling"].includes(
     data.status
@@ -140,80 +188,25 @@ export function TaskDetailView({
     <ScrollArea className="w-full flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
         {/* Master Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between">
-            <div className="flex flex-col gap-1.5">
-              <CardTitle className="text-xl">
-                {data.filename || "Document"}
-              </CardTitle>
-              <CardDescription>
-                {data.file_size
-                  ? `${(data.file_size / 1024 / 1024).toFixed(2)} MB`
-                  : "Unknown Size"}
-                {" • "}
-                {isParsing ? `${data.page_count || 0} Pages • ` : ""}
-                {total} {isParsing ? "Parts" : "Chunks"}
-                {cancelled > 0 && ` • ${cancelled} Cancelled`}
-                {data.created_at &&
-                  ` • Started at ${new Date(
-                    data.created_at
-                  ).toLocaleTimeString()}`}
-                {data.status === "completed" &&
-                  typeof data.processing_time === "number" && (
-                    <>
-                      {" • Total time: "}
-                      {formatProcessingTime(data.processing_time)}
-                    </>
-                  )}
-              </CardDescription>
-            </div>
-            <StatusBadge status={data.status} />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {completed} / {total} {isParsing ? "parts" : "chunks"} done
-                </span>
-                <span className="font-medium">
-                  {Math.round(progressValue)}%
-                </span>
-              </div>
-              <Progress className="h-2" value={progressValue} />
-            </div>
+        <TaskMasterCard
+          cancelled={cancelled}
+          completed={completed}
+          data={data}
+          failed={failed}
+          isParsing={isParsing}
+          itemTerm={itemTerm}
+          itemTermLower={itemTermLower}
+          processing={processing}
+          progressValue={progressValue}
+          total={total}
+          waiting={waiting}
+        />
 
-            {isParsing && (
-              <div className="mt-2 flex w-full items-center justify-between font-medium text-xs">
-                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500">
-                  <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-500" />
-                  {completed} Done
-                </div>
-                <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-500">
-                  <span className="size-2 animate-pulse rounded-full bg-blue-600 dark:bg-blue-500" />
-                  {processing} Processing
-                </div>
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <span className="size-2 rounded-full bg-muted-foreground" />
-                  {waiting} Waiting
-                </div>
-                <div className="flex items-center gap-1.5 text-destructive">
-                  <span className="size-2 rounded-full bg-destructive" />
-                  {failed} Failed
-                </div>
-                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
-                  <span className="size-2 rounded-full bg-amber-600 dark:bg-amber-500" />
-                  {cancelled} Cancelled
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Parts List */}
+        {/*List */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-row items-center justify-between">
             <h3 className="font-semibold text-lg">
-              {isParsing ? "Parts" : "Chunks"} ({total})
+              {itemTerm} ({total})
             </h3>
             <Button
               className="cursor-pointer"
@@ -221,33 +214,49 @@ export function TaskDetailView({
               onClick={handleDownloadFull}
             >
               <Download />
-              <span className="text-nowrap">
-                {isParsing ? "Download Merged Document" : "Download JSON"}
-              </span>
+              <span className="text-nowrap">{downloadLabel}</span>
             </Button>
           </div>
           <div className="flex flex-col gap-3">
-            {items?.map((item, idx: number) => {
-              if (isParsing) {
-                const parseItem = item as PartResponse;
+            {items
+              ?.slice(0, isParsing ? 50 : undefined)
+              .map((item, idx: number) => {
+                if (isParsing) {
+                  const parseItem = item as PartResponse;
+                  return (
+                    <ItemCard
+                      item={parseItem}
+                      key={parseItem.part_index}
+                      taskId={taskId}
+                      type="parse"
+                    />
+                  );
+                }
+                if (isEmbedding) {
+                  const embedItem = item as EmbedItem;
+                  return (
+                    <ItemCard
+                      item={embedItem}
+                      key={embedItem.chunk_id || idx}
+                      type="embed"
+                    />
+                  );
+                }
+                const chunkItem = item as ChunkItem;
                 return (
                   <ItemCard
-                    item={parseItem}
-                    key={parseItem.part_index}
-                    taskId={taskId}
-                    type="parse"
+                    item={chunkItem}
+                    key={chunkItem.chunk_id || idx}
+                    type="chunk"
                   />
                 );
-              }
-              const chunkItem = item as ChunkItem;
-              return (
-                <ItemCard
-                  item={chunkItem}
-                  key={chunkItem.chunk_id || idx}
-                  type="chunk"
-                />
-              );
-            })}
+              })}
+            {!isParsing && items && total > 50 && (
+              <div className="mt-2 text-center text-muted-foreground text-sm">
+                + {total - (items?.length || 0)} more {itemTermLower} not shown.{" "}
+                {downloadLabel} to view all.
+              </div>
+            )}
           </div>
         </div>
 

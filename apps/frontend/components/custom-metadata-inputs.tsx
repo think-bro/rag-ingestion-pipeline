@@ -9,7 +9,7 @@ export function CustomMetadataInputs({
   isFormPending,
   setCustomMetadata,
 }: {
-  taskType: "unselected" | "parse" | "chunk";
+  taskType: "unselected" | "parse" | "chunk" | "embed";
   preset: string;
   CHUNK_PRESETS?: PresetsResponse;
   isFormPending: boolean;

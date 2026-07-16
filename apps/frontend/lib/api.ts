@@ -43,12 +43,13 @@ export interface ParseTaskResponse {
   error?: string;
   file_size?: number;
   filename?: string;
+  items?: PartResponse[];
   output_format?: string;
   page_count?: number;
-  parts?: PartResponse[];
   processing_time?: number;
   status: TaskStatus;
   task_id: string;
+  task_type: "parsing";
   total_parts?: number;
 }
 
@@ -70,7 +71,6 @@ export interface ChunkConfig {
 
 export interface ChunkItem {
   chunk_id: string;
-  contextualized_text: string;
   metadata: {
     chunk_index: number;
     token_count: number;
@@ -79,25 +79,49 @@ export interface ChunkItem {
     breadcrumb: string;
     [key: string]: unknown;
   };
-  text: string;
 }
 
 export interface ChunkTaskResponse {
-  chunks?: ChunkItem[];
   config?: ChunkConfig;
   created_at?: string;
   error?: string;
   file_size?: number;
   filename?: string;
+  items?: ChunkItem[];
   processing_time?: number;
   status: TaskStatus;
   task_id: string;
+  task_type: "chunking";
   total_chunks?: number;
 }
 
+export interface EmbedItem {
+  chunk_id: string;
+  metadata: {
+    chunk_index: number;
+    [key: string]: unknown;
+  };
+}
+
+export interface EmbedTaskResponse {
+  created_at?: string;
+  embedding_dim?: number;
+  error?: string;
+  file_size?: number;
+  filename?: string;
+  items?: EmbedItem[];
+  model_name?: string;
+  processing_time?: number;
+  status: TaskStatus;
+  task_id: string;
+  task_type: "embedding";
+  total_vectors?: number;
+}
+
 export type CombinedTask =
-  | (ParseTaskResponse & { task_type: "parsing" })
-  | (ChunkTaskResponse & { task_type: "chunking" });
+  | ParseTaskResponse
+  | ChunkTaskResponse
+  | EmbedTaskResponse;
 
 const BASE_URL =
   process.env.NODE_ENV === "development"
@@ -158,15 +182,19 @@ export const api = {
   async submitTask(
     fileId: string,
     filename: string,
-    action: "parse" | "chunk" = "parse",
+    action: "parse" | "chunk" | "embed" = "parse",
     formatOrPreset?: string,
     customMetadata?: Record<string, string>,
     presetData?: Preset
   ): Promise<{ task_id: string; status: string; message: string }> {
-    const endpoint =
-      action === "chunk"
-        ? `${BASE_URL}/chunk-tasks`
-        : `${BASE_URL}/parse-tasks`;
+    let endpoint = `${BASE_URL}/parse-tasks`;
+    if (action === "chunk") {
+      endpoint = `${BASE_URL}/chunk-tasks`;
+    }
+    if (action === "embed") {
+      endpoint = `${BASE_URL}/embed-tasks`;
+    }
+
     let body: Record<string, unknown>;
     if (action === "chunk") {
       if (!presetData) {
@@ -182,6 +210,11 @@ export const api = {
           custom_metadata:
             customMetadata || presetData.config_overrides.custom_metadata || {},
         },
+      };
+    } else if (action === "embed") {
+      body = {
+        file_id: fileId,
+        filename,
       };
     } else {
       body = {
@@ -328,6 +361,53 @@ export const api = {
     const res = await fetch(`${BASE_URL}/chunk-tasks/${taskId}/download`);
     if (!res.ok) {
       throw new Error(`Failed to download chunks: ${res.statusText}`);
+    }
+    return res.blob();
+  },
+
+  // --- Embedding Endpoints ---
+
+  async getEmbedTasks(): Promise<EmbedTaskResponse[]> {
+    const res = await fetch(`${BASE_URL}/embed-tasks`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch embed tasks: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async getEmbedTaskResult(taskId: string): Promise<EmbedTaskResponse> {
+    const res = await fetch(`${BASE_URL}/embed-tasks/${taskId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch embed task result: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async deleteEmbedTask(taskId: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/embed-tasks/${taskId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete embed task: ${res.statusText}`);
+    }
+  },
+
+  async cancelEmbedTask(
+    taskId: string
+  ): Promise<{ task_id: string; status: string; message: string }> {
+    const res = await fetch(`${BASE_URL}/embed-tasks/${taskId}/cancel`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to cancel embed task: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async downloadEmbeddings(taskId: string): Promise<Blob> {
+    const res = await fetch(`${BASE_URL}/embed-tasks/${taskId}/download`);
+    if (!res.ok) {
+      throw new Error(`Failed to download embeddings: ${res.statusText}`);
     }
     return res.blob();
   },
