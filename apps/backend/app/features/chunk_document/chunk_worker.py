@@ -137,7 +137,7 @@ def main() -> None:
 
         # Generate preview JSON (max 50 items)
         preview_items = []
-        for c in enumerate(result[:50]):
+        for c in result[:50]:
             preview_items.append(
                 {
                     "chunk_id": c.get("chunk_id", ""),
