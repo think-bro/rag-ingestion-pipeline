@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.5.0...backend-v0.6.0) (2026-07-17)
+
+
+### Features
+
+* **backend:** add embedding feature slice with fastembed ([d9db36a](https://github.com/think-bro/rag-ingestion-pipeline/commit/d9db36a8b9f76a2032a53929d21727867f3e4a70))
+* **backend:** implement recursive document chunking service and controllers ([de0961b](https://github.com/think-bro/rag-ingestion-pipeline/commit/de0961b0133e38599d6a478bc3aefef492c3cb6b))
+* Implement document embedding to pipeline ([56e7291](https://github.com/think-bro/rag-ingestion-pipeline/commit/56e729128bc3b729b6d254921fcb40e57533c273))
+* Implement recursive document chunking to pipeline ([a1fd0fb](https://github.com/think-bro/rag-ingestion-pipeline/commit/a1fd0fb2494458be2a412b8e0dd6e247849ec0de))
+
+
+### Bug Fixes
+
+* **backend:** iterate result directly instead of enumerate ([7223f54](https://github.com/think-bro/rag-ingestion-pipeline/commit/7223f542803e04828b7eb61a25cdfcae3d4ef63f))
+
 ## [0.5.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.4.0...backend-v0.5.0) (2026-06-25)
 
 
