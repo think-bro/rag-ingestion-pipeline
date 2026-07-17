@@ -67,10 +67,7 @@ jobs:
         with:
           images: odest/${{ matrix.service }}
           tags: |
-            type=raw,value=${{ needs.resolve.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=semver,pattern={{version}},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=raw,value=${{ needs.resolve.outputs.version }}
             type=raw,value=latest
 
       - name: Build and push
