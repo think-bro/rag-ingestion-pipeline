@@ -8,10 +8,10 @@ CHUNK_PRESETS: dict[str, dict[str, Any]] = {
             "chunk_size": 512,
             "chunk_overlap": 64,
             "headers_to_split_on": [
-                ("#", "Ünite"),
-                ("##", "Bölüm"),
-                ("###", "Konu"),
-                ("####", "Alt Konu"),
+                ("#", "unit"),
+                ("##", "section"),
+                ("###", "topic"),
+                ("####", "subtopic"),
             ],
             "custom_metadata": {
                 "document_type": "Milli Eğitim Bakanlığı Ders Kitabı",

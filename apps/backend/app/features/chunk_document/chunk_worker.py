@@ -2,8 +2,8 @@ import argparse
 import json
 import sys
 import signal
-import hashlib
 from typing import cast, Any
+from uuid import NAMESPACE_URL, uuid5
 
 from tokenizers import Tokenizer as HFTokenizer
 from langchain_text_splitters import MarkdownHeaderTextSplitter
@@ -108,7 +108,7 @@ def main() -> None:
 
                 # Deterministic Chunk ID
                 # Helps vector databases to upsert instead of duplicating chunks
-                deterministic_id = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+                deterministic_id = str(uuid5(NAMESPACE_URL, text))
 
                 metadata["chunk_index"] = chunk_index
                 metadata["source_file"] = args.source_filename
@@ -137,7 +137,7 @@ def main() -> None:
 
         # Generate preview JSON (max 50 items)
         preview_items = []
-        for i, c in enumerate(result[:50]):
+        for c in enumerate(result[:50]):
             preview_items.append(
                 {
                     "chunk_id": c.get("chunk_id", ""),
