@@ -47,6 +47,15 @@ class EmbedDocumentService:
 
         config = EmbedConfig()
 
+        total_vectors = 0
+        try:
+            content = await path_obj.read_text(encoding="utf-8")
+            data = json.loads(content)
+            if "chunks" in data and isinstance(data["chunks"], list):
+                total_vectors = len(data["chunks"])
+        except Exception as e:
+            logger.warning("failed_to_count_chunks_at_submission", error=str(e))
+
         pending_data = {
             "task_id": task_id,
             "task_type": "embedding",
@@ -55,7 +64,8 @@ class EmbedDocumentService:
             "config": config.model_dump_json(),
             "created_at": datetime.now(timezone.utc).isoformat(),
             "file_size": file_size,
-            "total_vectors": 0,
+            "total_vectors": total_vectors,
+            "completed_vectors": 0,
         }
         await self.redis.hset(f"embed_task:{task_id}", mapping=pending_data)
 
@@ -85,6 +95,8 @@ class EmbedDocumentService:
             task_data["file_size"] = int(task_data["file_size"])
         if "total_vectors" in task_data:
             task_data["total_vectors"] = int(task_data["total_vectors"])
+        if "completed_vectors" in task_data:
+            task_data["completed_vectors"] = int(task_data["completed_vectors"])
         if "config" in task_data:
             task_data["config"] = json.loads(task_data["config"])
 
@@ -123,6 +135,8 @@ class EmbedDocumentService:
                 data["file_size"] = int(data["file_size"])
             if "total_vectors" in data:
                 data["total_vectors"] = int(data["total_vectors"])
+            if "completed_vectors" in data:
+                data["completed_vectors"] = int(data["completed_vectors"])
             if "config" in data:
                 data["config"] = json.loads(data["config"])
 

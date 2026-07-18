@@ -41,6 +41,7 @@ class EmbedTaskResponse(BaseModel):
     processing_time: Optional[float] = None
     file_size: Optional[int] = None
     total_vectors: Optional[int] = None
+    completed_vectors: Optional[int] = None
     config: Optional[EmbedConfig] = None
     items: Optional[list[EmbedItem]] = None
 
@@ -56,6 +57,7 @@ class EmbedTaskListDTO(PydanticDTO[EmbedTaskResponse]):
             "processing_time",
             "file_size",
             "total_vectors",
+            "completed_vectors",
             "config",
         }
     )

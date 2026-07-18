@@ -52,6 +52,7 @@ async def embed_task(
     output_preview_path = str(EMBEDDINGS_DIR / f"{task_id}_preview.json")
     final_output_path = EMBEDDINGS_DIR / f"{task_id}.parquet"
     error_json_path = str(EMBEDDINGS_DIR / f"{task_id}_error.json")
+    progress_json_path = str(EMBEDDINGS_DIR / f"{task_id}_progress.json")
 
     task_status = TaskStatus.FAILED.value
     error_msg = None
@@ -67,6 +68,7 @@ async def embed_task(
             output_parquet_path,
             output_preview_path,
             error_json_path,
+            progress_json_path,
         )
 
         while True:
@@ -74,6 +76,24 @@ async def embed_task(
                 await asyncio.wait_for(process.wait(), timeout=SUBPROCESS_POLL_INTERVAL)
                 break
             except asyncio.TimeoutError:
+                if os.path.exists(progress_json_path):
+                    try:
+                        with open(progress_json_path, "r", encoding="utf-8") as f:
+                            prog_data = json.load(f)
+                        if "completed" in prog_data:
+                            await redis.hset(
+                                f"embed_task:{task_id}",
+                                "completed_vectors",
+                                prog_data["completed"],
+                            )
+                        if "total" in prog_data:
+                            await redis.hset(
+                                f"embed_task:{task_id}",
+                                "total_vectors",
+                                prog_data["total"],
+                            )
+                    except Exception as e:
+                        logger.warning("failed_to_read_progress_json", error=str(e))
                 pass
 
             if await redis.exists(cancel_key):

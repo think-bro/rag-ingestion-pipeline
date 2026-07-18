@@ -28,6 +28,7 @@ def main():
     )
     parser.add_argument("output_preview_path", help="Path to save the preview JSON")
     parser.add_argument("error_json_path", help="Path to save error JSON if failed")
+    parser.add_argument("progress_json_path", help="Path to save progress JSON")
     args = parser.parse_args()
 
     # Register SIGTERM handler
@@ -51,9 +52,20 @@ def main():
 
         # Prepare texts
         texts = [c.get("contextualized_text", c.get("text", "")) for c in chunks]
+        total_chunks = len(chunks)
 
-        embeddings_generator = embedding_model.embed(texts, batch_size=8)
-        embeddings_list = list(embeddings_generator)
+        progress_data = {"completed": 0, "total": total_chunks}
+        with open(args.progress_json_path, "w", encoding="utf-8") as f:
+            json.dump(progress_data, f)
+
+        embeddings_list = []
+        for i, vector in enumerate(embedding_model.embed(texts, batch_size=8), start=1):
+            embeddings_list.append(vector)
+
+            if i % 8 == 0 or i == total_chunks:
+                progress_data["completed"] = i
+                with open(args.progress_json_path, "w", encoding="utf-8") as f:
+                    json.dump(progress_data, f)
 
         # Build pyarrow table
         chunk_ids = [c.get("chunk_id", "") for c in chunks]
