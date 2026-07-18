@@ -95,7 +95,7 @@ export function NewIngestionForm({
     "unselected" | "parse" | "chunk" | "embed"
   >("unselected");
   const [preset, setPreset] = useState("unselected");
-  const [format, _setFormat] = useState("text");
+  const [format, _setFormat] = useState("markdown");
   const [customMetadata, setCustomMetadata] = useState<Record<string, string>>(
     {}
   );
