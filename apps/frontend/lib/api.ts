@@ -104,6 +104,7 @@ export interface EmbedItem {
 }
 
 export interface EmbedTaskResponse {
+  completed_vectors?: number;
   created_at?: string;
   embedding_dim?: number;
   error?: string;

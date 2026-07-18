@@ -54,6 +54,8 @@ export function useEmbeddingTaskDetailData(taskId: string | null) {
   if (query.data) {
     const data = query.data;
     total = data.total_vectors || 0;
+    completed = data.completed_vectors || 0;
+
     if (data.status === "completed") {
       completed = total;
     }
