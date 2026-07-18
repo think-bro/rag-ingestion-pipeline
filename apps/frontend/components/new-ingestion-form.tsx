@@ -3,7 +3,7 @@
 import { FileText, Loader2, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type FileRejection, useDropzone } from "react-dropzone";
-import { CustomMetadataInputs } from "@/components/custom-metadata-inputs";
+import { CustomMetadataSelects } from "@/components/custom-metadata-selects";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -262,7 +262,7 @@ export function NewIngestionForm({
           </div>
         )}
 
-        <CustomMetadataInputs
+        <CustomMetadataSelects
           CHUNK_PRESETS={CHUNK_PRESETS}
           isFormPending={isFormPending}
           preset={preset}

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import type { PresetsResponse } from "@/lib/api";
 
-export function CustomMetadataInputs({
+export function CustomMetadataSelects({
   taskType,
   preset,
   CHUNK_PRESETS,
