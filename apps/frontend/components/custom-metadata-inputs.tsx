@@ -1,5 +1,12 @@
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { PresetsResponse } from "@/lib/api";
 
 export function CustomMetadataInputs({
@@ -26,6 +33,7 @@ export function CustomMetadataInputs({
   }
 
   const metadata = CHUNK_PRESETS[preset].config_overrides.custom_metadata || {};
+  const metadataOptions = CHUNK_PRESETS[preset].metadata_options || {};
   const unspecified = Object.entries(metadata).filter(
     ([_, val]) => val === "Unspecified"
   );
@@ -35,34 +43,38 @@ export function CustomMetadataInputs({
   }
 
   return (
-    <div className="col-span-full mt-2 grid grid-cols-1 gap-4 border-t pt-4 sm:grid-cols-2">
-      <div className="col-span-full mb-2">
-        <h4 className="font-medium text-foreground text-sm">Custom Metadata</h4>
-        <p className="text-muted-foreground text-xs">
-          Please provide the required metadata for the{" "}
-          {CHUNK_PRESETS[preset].name} preset.
-        </p>
-      </div>
-      {unspecified.map(([key]) => (
-        <div className="space-y-2" key={key}>
-          <Label className="font-medium capitalize" htmlFor={`meta-${key}`}>
-            {key.replace(/_/g, " ")}
-          </Label>
-          <Input
+    <div className="col-span-full grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {unspecified.map(([key]) => {
+        const options = metadataOptions[key] || [];
+        const labelText = key.replace(/_/g, " ");
+        const capitalizedLabel =
+          labelText.charAt(0).toUpperCase() + labelText.slice(1);
+
+        return (
+          <Select
             disabled={isFormPending}
-            id={`meta-${key}`}
-            onChange={(e) =>
-              setCustomMetadata((prev) => ({
-                ...prev,
-                [key]: e.target.value,
-              }))
+            key={key}
+            onValueChange={(v) =>
+              setCustomMetadata((prev) => ({ ...prev, [key]: v }))
             }
-            placeholder={`Enter ${key.replace(/_/g, " ")}`}
             required
-            type="text"
-          />
-        </div>
-      ))}
+          >
+            <SelectTrigger className="w-full" id={`meta-${key}`}>
+              <SelectValue placeholder={`Select a ${capitalizedLabel}`} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel className="capitalize">{labelText}s</SelectLabel>
+                {options.map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        );
+      })}
     </div>
   );
 }

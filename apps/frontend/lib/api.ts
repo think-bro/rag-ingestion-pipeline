@@ -16,6 +16,7 @@ export interface PresetConfigOverrides {
 export interface Preset {
   config_overrides: PresetConfigOverrides;
   description: string;
+  metadata_options?: Record<string, string[]>;
   name: string;
 }
 

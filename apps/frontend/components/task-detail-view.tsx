@@ -210,7 +210,12 @@ export function TaskDetailView({
             </h3>
             <Button
               className="cursor-pointer"
-              disabled={isTaskProcessing || completed === 0 || isDownloading || data.status === "failed"}
+              disabled={
+                isTaskProcessing ||
+                completed === 0 ||
+                isDownloading ||
+                data.status === "failed"
+              }
               onClick={handleDownloadFull}
             >
               <Download />
