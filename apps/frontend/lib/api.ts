@@ -195,7 +195,8 @@ export const api = {
     action: "parse" | "chunk" | "embed" = "parse",
     formatOrPreset?: string,
     customMetadata?: Record<string, string>,
-    presetData?: Preset
+    presetData?: Preset,
+    embedModel?: string
   ): Promise<{ task_id: string; status: string; message: string }> {
     let endpoint = `${BASE_URL}/parse-tasks`;
     if (action === "chunk") {
@@ -225,6 +226,7 @@ export const api = {
       body = {
         file_id: fileId,
         filename,
+        config: embedModel ? { model_name: embedModel } : undefined,
       };
     } else {
       body = {
@@ -420,5 +422,13 @@ export const api = {
       throw new Error(`Failed to download embeddings: ${res.statusText}`);
     }
     return res.blob();
+  },
+
+  async getEmbedModels(): Promise<{ id: string; name: string }[]> {
+    const res = await fetch(`${BASE_URL}/embed-models`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch embed models: ${res.statusText}`);
+    }
+    return res.json();
   },
 };

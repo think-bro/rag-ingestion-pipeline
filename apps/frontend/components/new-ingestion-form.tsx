@@ -1,10 +1,10 @@
 "use client";
 
-import { FileText, Loader2, Trash } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type FileRejection, useDropzone } from "react-dropzone";
 import { CustomMetadataSelects } from "@/components/custom-metadata-selects";
-import { Button } from "@/components/ui/button";
+import { FileListItem } from "@/components/file-list-item";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -15,10 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useEmbedModels } from "@/hooks/use-embedding-tasks";
 import { useIngestionSubmit } from "@/hooks/use-ingestion-submit";
 import { usePresets, useSubmitTask } from "@/hooks/use-tasks";
 import { useUploadItems } from "@/hooks/use-upload-items";
-import { cn, formatBytes } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useFormStore } from "@/store/form-store";
 import { useTaskStore } from "@/store/task-store";
 
 const TASK_OPTIONS = [
@@ -71,6 +73,58 @@ function getAcceptedFiles(
   return;
 }
 
+function getMissingSelectionMessage(
+  taskType: string,
+  preset: string,
+  embedModel: string
+): string | null {
+  if (taskType === "unselected") {
+    return "Please select a Task Type first";
+  }
+  if (taskType === "chunk" && preset === "unselected") {
+    return "Please select a Chunking Preset first";
+  }
+  if (taskType === "embed" && embedModel === "unselected") {
+    return "Please select an Embedding Model first";
+  }
+  return null;
+}
+
+function getDropzoneSubtitle(taskType: string): string {
+  if (taskType === "chunk") {
+    return "Markdown documents up to 100MB";
+  }
+  if (taskType === "embed") {
+    return "JSON documents up to 100MB";
+  }
+  return "PDF documents up to 100MB";
+}
+
+function isDropzoneDisabled(
+  taskType: string,
+  preset: string,
+  embedModel: string,
+  itemCount: number,
+  isFormPending: boolean
+): boolean {
+  if (isFormPending) {
+    return true;
+  }
+  if (taskType === "unselected") {
+    return true;
+  }
+  if (taskType === "chunk" && itemCount >= 1) {
+    return true;
+  }
+  if (taskType === "chunk" && preset === "unselected") {
+    return true;
+  }
+  if (taskType === "embed" && embedModel === "unselected") {
+    return true;
+  }
+  return false;
+}
+
 export function NewIngestionForm({
   id,
   onSuccess,
@@ -91,17 +145,21 @@ export function NewIngestionForm({
   const { data: CHUNK_PRESETS, isLoading: isLoadingPresets } = usePresets();
   const { setActiveTask, setNewIngestionModalOpen } = useTaskStore();
 
-  const [taskType, setTaskType] = useState<
-    "unselected" | "parse" | "chunk" | "embed"
-  >("unselected");
-  const [preset, setPreset] = useState("unselected");
-  const [format, _setFormat] = useState("markdown");
+  const taskType = useFormStore((s) => s.taskType);
+  const setTaskType = useFormStore((s) => s.setTaskType);
+  const preset = useFormStore((s) => s.preset);
+  const setPreset = useFormStore((s) => s.setPreset);
+  const embedModel = useFormStore((s) => s.embedModel);
+  const setEmbedModel = useFormStore((s) => s.setEmbedModel);
+  const format = useFormStore((s) => s.format);
   const [customMetadata, setCustomMetadata] = useState<Record<string, string>>(
     {}
   );
 
   const isUploading = items.some((i) => i.status === "uploading");
   const isFormPending = isPending || isUploading;
+  const { data: embedModels, isLoading: isLoadingEmbedModels } =
+    useEmbedModels();
 
   useEffect(() => {
     onStateChange?.({
@@ -118,73 +176,32 @@ export function NewIngestionForm({
       accept: getAcceptedFiles(taskType),
       maxSize: 512 * 1024 * 1024, // TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
       maxFiles: taskType === "chunk" ? 1 : undefined,
-      disabled:
-        isFormPending ||
-        (taskType === "chunk" && items.length >= 1) ||
-        taskType === "unselected" ||
-        (taskType === "chunk" && preset === "unselected"),
+      disabled: isDropzoneDisabled(
+        taskType,
+        preset,
+        embedModel,
+        items.length,
+        isFormPending
+      ),
       onDrop,
     });
 
   const errorMessage = getErrorMessage(fileRejections, taskType);
 
   const filesList = items.map((item) => (
-    <li className="relative" key={item.id}>
-      <div className="relative rounded-xl border border-border p-4 shadow-none">
-        <div className="absolute top-1/2 right-4 -translate-y-1/2">
-          <Button
-            aria-label="Remove file"
-            disabled={isFormPending}
-            onClick={() => removeFile(item.id)}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <Trash aria-hidden={true} className="h-5 w-5" />
-          </Button>
-        </div>
-        <div className="flex items-center space-x-3 p-0">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted">
-            <FileText aria-hidden={true} className="h-5 w-5 text-foreground" />
-          </span>
-          <div>
-            <p className="text-pretty font-medium text-foreground">
-              {item.file.name}
-            </p>
-            <p className="mt-0.5 flex items-center gap-2 text-pretty text-muted-foreground text-sm">
-              <span>{formatBytes(item.file.size)}</span>
-              {item.status === "uploading" && (
-                <>
-                  <span>&bull;</span>
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Uploading...</span>
-                </>
-              )}
-              {item.status === "success" &&
-                item.uploadResponse?.page_count !== null &&
-                item.uploadResponse?.page_count !== undefined && (
-                  <>
-                    <span>&bull;</span>
-                    <span>{item.uploadResponse.page_count} pages</span>
-                  </>
-                )}
-              {item.status === "error" && (
-                <>
-                  <span>&bull;</span>
-                  <span className="text-destructive">Upload failed</span>
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-    </li>
+    <FileListItem
+      isFormPending={isFormPending}
+      item={item}
+      key={item.id}
+      removeFile={removeFile}
+    />
   ));
 
   const handleSubmit = useIngestionSubmit({
     items,
     taskType,
     preset,
+    embedModel,
     format,
     customMetadata,
     onSuccess,
@@ -262,6 +279,37 @@ export function NewIngestionForm({
           </div>
         )}
 
+        {taskType === "embed" && (
+          <div className="col-span-full sm:col-span-3">
+            <Select
+              disabled={isFormPending}
+              onValueChange={(v: string) => setEmbedModel(v)}
+              value={embedModel}
+            >
+              <SelectTrigger className="w-full" id="embed-model">
+                <SelectValue placeholder="Select embedding model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Models</SelectLabel>
+                  <SelectItem value="unselected">Select a Model</SelectItem>
+                  {isLoadingEmbedModels ? (
+                    <SelectItem disabled value="loading">
+                      Loading...
+                    </SelectItem>
+                  ) : (
+                    (embedModels || []).map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <CustomMetadataSelects
           CHUNK_PRESETS={CHUNK_PRESETS}
           isFormPending={isFormPending}
@@ -281,7 +329,8 @@ export function NewIngestionForm({
                 ? "border-primary bg-primary/10 ring-2 ring-primary/20"
                 : "border-border",
               taskType === "unselected" ||
-                (taskType === "chunk" && preset === "unselected")
+                (taskType === "chunk" && preset === "unselected") ||
+                (taskType === "embed" && embedModel === "unselected")
                 ? "cursor-not-allowed bg-muted/50 opacity-60"
                 : "",
               "mt-2 flex justify-center rounded-md border border-dashed px-6 py-20 transition-colors duration-200"
@@ -293,12 +342,9 @@ export function NewIngestionForm({
                 className="mx-auto h-12 w-12 text-muted-foreground/80"
               />
               <div className="mt-4 flex flex-col items-center text-muted-foreground">
-                {taskType === "unselected" ||
-                (taskType === "chunk" && preset === "unselected") ? (
+                {getMissingSelectionMessage(taskType, preset, embedModel) ? (
                   <p className="font-medium text-foreground text-sm">
-                    {taskType === "unselected"
-                      ? "Please select a Task Type first"
-                      : "Please select a Chunking Preset first"}
+                    {getMissingSelectionMessage(taskType, preset, embedModel)}
                   </p>
                 ) : (
                   <div className="flex">
@@ -312,21 +358,8 @@ export function NewIngestionForm({
                 )}
               </div>
               <p className="mt-2 text-center text-muted-foreground/70 text-xs">
-                {(() => {
-                  if (taskType === "unselected") {
-                    return "Please select a Task Type first";
-                  }
-                  if (taskType === "chunk" && preset === "unselected") {
-                    return "Select a Chunking Preset to continue";
-                  }
-                  if (taskType === "chunk") {
-                    return "Markdown documents up to 100MB";
-                  }
-                  if (taskType === "embed") {
-                    return "JSON documents up to 100MB";
-                  }
-                  return "PDF documents up to 100MB";
-                })()}
+                {getMissingSelectionMessage(taskType, preset, embedModel) ??
+                  getDropzoneSubtitle(taskType)}
               </p>
               {errorMessage && (
                 <p className="mt-3 text-center text-destructive text-sm">

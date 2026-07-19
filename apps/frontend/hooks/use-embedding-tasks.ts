@@ -23,6 +23,14 @@ export function useEmbedTaskResult(taskId: string | null) {
   });
 }
 
+export function useEmbedModels() {
+  return useQuery({
+    queryKey: ["embed-models"],
+    queryFn: () => api.getEmbedModels(),
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
+}
+
 export function useDownloadEmbedFull() {
   return useMutation({
     mutationFn: (args: { taskId: string; filename?: string }) =>

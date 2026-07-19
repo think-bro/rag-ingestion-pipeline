@@ -5,6 +5,7 @@ export function useIngestionSubmit({
   items,
   taskType,
   preset,
+  embedModel,
   format,
   customMetadata,
   onSuccess,
@@ -17,6 +18,7 @@ export function useIngestionSubmit({
   items: UploadItem[];
   taskType: "unselected" | "parse" | "chunk" | "embed";
   preset: string;
+  embedModel?: string;
   format: string;
   customMetadata: Record<string, string>;
   onSuccess: () => void;
@@ -25,6 +27,7 @@ export function useIngestionSubmit({
     filename: string;
     action?: "parse" | "chunk" | "embed";
     formatOrPreset?: string;
+    embedModel?: string;
     customMetadata?: Record<string, string>;
     presetData?: Preset;
   }) => Promise<{ task_id: string }>;
@@ -46,7 +49,8 @@ export function useIngestionSubmit({
     if (
       successfulItems.length === 0 ||
       taskType === "unselected" ||
-      (taskType === "chunk" && preset === "unselected")
+      (taskType === "chunk" && preset === "unselected") ||
+      (taskType === "embed" && embedModel === "unselected")
     ) {
       return;
     }
@@ -61,6 +65,7 @@ export function useIngestionSubmit({
           filename: item.uploadResponse.filename,
           action: taskType,
           formatOrPreset: taskType === "chunk" ? preset : format,
+          embedModel: taskType === "embed" ? embedModel : undefined,
           customMetadata: taskType === "chunk" ? customMetadata : undefined,
           presetData:
             taskType === "chunk" && CHUNK_PRESETS
