@@ -150,11 +150,11 @@ export function TaskDetailView({
 
   const handleDownloadFull = () => {
     if (isParsing) {
-      downloadParseMutation.mutate(taskId);
+      downloadParseMutation.mutate({ taskId, filename: data.filename });
     } else if (isEmbedding) {
-      downloadEmbedMutation.mutate(taskId);
+      downloadEmbedMutation.mutate({ taskId, filename: data.filename });
     } else {
-      downloadChunksMutation.mutate(taskId);
+      downloadChunksMutation.mutate({ taskId, filename: data.filename });
     }
   };
 

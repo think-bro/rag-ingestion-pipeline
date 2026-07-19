@@ -67,12 +67,20 @@ export function useDownloadPart() {
 
 export function useDownloadParseFull() {
   return useMutation({
-    mutationFn: (taskId: string) => api.downloadParseFullContent(taskId),
-    onSuccess: (blob, taskId) => {
+    mutationFn: (args: { taskId: string; filename?: string }) =>
+      api.downloadParseFullContent(args.taskId),
+    onSuccess: (blob, variables) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `document_${taskId}_parsed.md`);
+      let downloadName = `document_${variables.taskId}_parsed.md`;
+      if (variables.filename) {
+        const baseName =
+          variables.filename.split(".").slice(0, -1).join(".") ||
+          variables.filename;
+        downloadName = `${baseName}.md`;
+      }
+      link.setAttribute("download", downloadName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);

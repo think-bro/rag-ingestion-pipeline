@@ -25,12 +25,20 @@ export function useEmbedTaskResult(taskId: string | null) {
 
 export function useDownloadEmbedFull() {
   return useMutation({
-    mutationFn: (taskId: string) => api.downloadEmbeddings(taskId),
-    onSuccess: (blob, taskId) => {
+    mutationFn: (args: { taskId: string; filename?: string }) =>
+      api.downloadEmbeddings(args.taskId),
+    onSuccess: (blob, variables) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `document_${taskId}_embeddings.parquet`);
+      let downloadName = `document_${variables.taskId}_embeddings.parquet`;
+      if (variables.filename) {
+        const baseName =
+          variables.filename.split(".").slice(0, -1).join(".") ||
+          variables.filename;
+        downloadName = `${baseName}.parquet`;
+      }
+      link.setAttribute("download", downloadName);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
