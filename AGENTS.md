@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. It also supports recursive chunking via Chonkie and LangChain, and vector embedding via FastEmbed. Future pipeline stages (vector storage) are not yet implemented.
+Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. It also supports recursive chunking via Chonkie and LangChain, vector embedding via FastEmbed, and indexing to push embeddings into vector databases.
 
 ## Tech Stack
 
-- Python 3.14, Docling, Chonkie, LangChain, FastEmbed, PyArrow, Pydantic, structlog
+- Python 3.14, Docling, Chonkie, LangChain, FastEmbed, PyArrow, Qdrant, qdrant-client, Pydantic, structlog
 - Backend: Litestar
 - Frontend: Next.js 16 (App Router, static export), React 19, shadcn/ui, Tailwind CSS v4
 - State Management: Zustand (client state), TanStack Query (server state)
@@ -208,14 +208,14 @@ The backend API uses URL path versioning (e.g., `/api/v1/`).
 For long-running operations (e.g., document parsing), the backend uses an **async task + polling** pattern via **TaskIQ** and **Redis**:
 
 1. **Upload Phase**: `POST /api/v1/documents/uploads` endpoint accepts a multipart file (up to 512MB), saves it to `/storage/uploads/`, extracts metadata (e.g., page count), and returns `file_id`.
-2. **Task Initialization**: Users select either parsing (`POST /api/v1/parse-tasks`), chunking (`POST /api/v1/chunk-tasks`), or embedding (`POST /api/v1/embed-tasks`). The endpoint splits the PDF into smaller parts in `/storage/parts/` (for parsing) or loads the uploaded Markdown file (for chunking/embedding). It writes a master `PENDING` state to Redis, enqueues parallel TaskIQ background tasks, and returns a `task_id`.
+2. **Task Initialization**: Users select either parsing (`POST /api/v1/parse-tasks`), chunking (`POST /api/v1/chunk-tasks`), embedding (`POST /api/v1/embed-tasks`), or indexing (`POST /api/v1/index-tasks`). The endpoint splits the PDF into smaller parts in `/storage/parts/` (for parsing) or loads the uploaded file (for chunking/embedding/indexing). It writes a master `PENDING` state to Redis, enqueues parallel TaskIQ background tasks, and returns a `task_id`.
 3. **Parallel Processing**: The actual processing is executed by background `worker` processes. Each worker handles a specific part. To prevent Out-Of-Memory (OOM) errors and allow parallelization, workers process smaller PDF parts.
-4. **Subprocess Isolation**: To support graceful cancellation and prevent memory leaks, CPU-intensive and ML-heavy work is isolated into a separate OS subprocess (`parse_worker.py` for Docling, `chunk_worker.py` for Chonkie/LangChain, `embed_worker.py` for FastEmbed). The TaskIQ worker runs an asynchronous polling loop to monitor the subprocess and a cancellation flag in Redis.
-5. **Cancellation**: If a user cancels the master task (`POST /api/v1/parse-tasks/{task_id}/cancel`, `/api/v1/chunk-tasks/{task_id}/cancel`, or `/api/v1/embed-tasks/{task_id}/cancel`), a flag is written to Redis. Workers detect this, send a `SIGTERM` to their subprocesses to kill them gracefully, and update the part state to the `cancelled_set`.
+4. **Subprocess Isolation**: To support graceful cancellation and prevent memory leaks, CPU-intensive and ML-heavy work is isolated into a separate OS subprocess (`parse_worker.py` for Docling, `chunk_worker.py` for Chonkie/LangChain, `embed_worker.py` for FastEmbed, `index_worker.py` for Qdrant). The TaskIQ worker runs an asynchronous polling loop to monitor the subprocess and a cancellation flag in Redis.
+5. **Cancellation**: If a user cancels the master task (`POST /api/v1/parse-tasks/{task_id}/cancel`, `/api/v1/chunk-tasks/{task_id}/cancel`, `/api/v1/embed-tasks/{task_id}/cancel`, or `/api/v1/index-tasks/{task_id}/cancel`), a flag is written to Redis. Workers detect this, send a `SIGTERM` to their subprocesses to kill them gracefully, and update the part state to the `cancelled_set`.
 6. **IPC Communication**: The subprocess communicates back to the parent worker using a temporary JSON file (IPC) to avoid `stdout` pipe deadlocks with massive Markdown outputs.
 7. **State Management**: The worker adds the part index to specific Redis Sets (`completed_set`, `failed_set`, or `cancelled_set`) and writes the result to disk as `.md` or `.json` files (`/storage/results/{task_id}_part_{index}.ext`). The master task status only evaluates to `FAILED` or `COMPLETED` when all parts are finished.
-8. **Retry Mechanism**: If a part fails, users can retry it via `POST /api/v1/parse-tasks/{task_id}/parts/{part_index}/retry` (or `/chunk-tasks/`, `/embed-tasks/`). This removes the part from `failed_set`, updates its status to `PROCESSING`, and re-enqueues the `part_task`.
-9. **Data Retrieval**: `GET /api/v1/parse-tasks/{task_id}` reads the master state and all part states from Redis sets. `GET /api/v1/parse-tasks/{task_id}/download` triggers the backend to dynamically merge all completed part files into a single `_merged.md` or `_merged.json` file and serves it to the user. (Similar structure applies to chunk-tasks and embed-tasks, where embeddings are served as `.parquet`).
+8. **Retry Mechanism**: If a part fails, users can retry it via `POST /api/v1/parse-tasks/{task_id}/parts/{part_index}/retry` (or `/chunk-tasks/`, `/embed-tasks/`, `/index-tasks/`). This removes the part from `failed_set`, updates its status to `PROCESSING`, and re-enqueues the `part_task`.
+9. **Data Retrieval**: `GET /api/v1/parse-tasks/{task_id}` reads the master state and all part states from Redis sets. `GET /api/v1/parse-tasks/{task_id}/download` triggers the backend to dynamically merge all completed part files into a single `_merged.md` or `_merged.json` file and serves it to the user. (Similar structure applies to chunk-tasks and embed-tasks, where embeddings are served as `.parquet`. For index-tasks, data is pushed directly to the vector DB, so no download is provided).
 10. **Frontend Polling**: The frontend uses **adaptive polling** (2s when active/cancelling, 10s when idle) via TanStack Query's `refetchInterval` to keep the UI in sync with the multi-part progress.
 11. **Reliability**: The `RedisStreamBroker` guarantees at-least-once delivery, so part tasks aren't lost if a worker crashes.
 12. **Cleanup**: A background cron task (`cleanup_orphaned_uploads_task`) runs hourly to delete uploaded files that were abandoned before parsing (older than 24 hours).
@@ -226,6 +226,7 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 - `apps/backend/app/features/parse_document/tasks.py`: Contains parsing TaskIQ tasks (`@broker.task()`).
 - `apps/backend/app/features/chunk_document/tasks.py`: Contains chunking TaskIQ tasks (`@broker.task()`).
 - `apps/backend/app/features/embed_document/tasks.py`: Contains embedding TaskIQ tasks (`@broker.task()`).
+- `apps/backend/app/features/index_document/tasks.py`: Contains indexing TaskIQ tasks (`@broker.task()`).
 
 ### Singleton Services
 
