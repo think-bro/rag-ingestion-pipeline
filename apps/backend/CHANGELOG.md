@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.6.0...backend-v0.7.0) (2026-07-19)
+
+
+### Features
+
+* **backend:** add predefined grade and subject metadata options to preset ([a10c52c](https://github.com/think-bro/rag-ingestion-pipeline/commit/a10c52cd74fa6807f10312fe410ba259bf564611))
+* **backend:** add vector indexing support and background tasks ([1d242d8](https://github.com/think-bro/rag-ingestion-pipeline/commit/1d242d879229ab12fe75df612b39ca0ae3a0c866))
+* **backend:** expose embedding models API and update request schemas ([21ab757](https://github.com/think-bro/rag-ingestion-pipeline/commit/21ab75735a302369a131d46a8cf87898078d720b))
+* **backend:** implement real-time progress tracking for vectors ([0031010](https://github.com/think-bro/rag-ingestion-pipeline/commit/0031010efea43a86b9a81d37d8559e8162eb8a35))
+* Implement vector database indexing pipeline ([b14442d](https://github.com/think-bro/rag-ingestion-pipeline/commit/b14442deec8477f430887fc337b1554d1653ed56))
+
 ## [0.6.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.5.0...backend-v0.6.0) (2026-07-17)
 
 
