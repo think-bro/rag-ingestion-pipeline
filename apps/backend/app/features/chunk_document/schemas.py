@@ -44,7 +44,20 @@ class ChunkItem(BaseModel):
 class ChunkRequest(BaseModel):
     file_id: str
     filename: str
+    preset_id: Optional[str] = None
     config: ChunkConfig = Field(default_factory=ChunkConfig)
+
+
+class ChunkPresetSummary(BaseModel):
+    id: str
+    name: str
+    description: str
+    metadata_options: dict[str, list[str]] = Field(default_factory=dict)
+    config_overrides: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChunkPresetListResponse(BaseModel):
+    presets: list[ChunkPresetSummary]
 
 
 class ChunkTaskResponse(BaseModel):

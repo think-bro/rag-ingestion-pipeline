@@ -1,1 +1,0 @@
-"""Get presets feature slice."""
