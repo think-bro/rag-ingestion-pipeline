@@ -26,15 +26,14 @@ apps/
 │   │   ├── main.py                  # App factory, lifespan, DI, CORS
 │   │   ├── core/
 │   │   │   ├── broker.py            # TaskIQ broker + Redis result backend
-│   │   │   ├── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
-│   │   │   └── presets.py           # Chunk configuration presets
+│   │   │   └── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
 │   │   └── features/
 │   │       ├── upload_document/     # File uploads
-│   │       ├── get_presets/         # Chunking presets
 │   │       ├── chunk_document/      # Hierarchical and recursive chunking
 │   │       │   ├── controller.py    # HTTP endpoints
 │   │       │   ├── service.py       # Task submission
 │   │       │   ├── schemas.py       # Pydantic chunk models
+│   │       │   ├── presets.py       # Chunk configuration presets
 │   │       │   ├── tasks.py         # TaskIQ background tasks
 │   │       │   └── chunk_worker.py  # Subprocess for tokenizer & chunker
 │   │       ├── embed_document/      # Vector embedding using FastEmbed
