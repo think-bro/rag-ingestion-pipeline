@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.6.0...frontend-v0.7.0) (2026-07-19)
+
+
+### Features
+
+* **frontend:** add embed model selection and persist form state via Zustand ([1d4e38d](https://github.com/think-bro/rag-ingestion-pipeline/commit/1d4e38d0cdc3cd8a301aa22803f0276254b41cf3))
+* **frontend:** add real-time progress bar updates for embedding tasks ([00fef85](https://github.com/think-bro/rag-ingestion-pipeline/commit/00fef856cac76ef509b7900d1664979f4cb18459))
+* **frontend:** add vector db selection and indexing task progress ui ([7ad5a3e](https://github.com/think-bro/rag-ingestion-pipeline/commit/7ad5a3e63bd0ef62c42669b684f52a8be5cceda1))
+* **frontend:** replace text inputs with select dropdowns for preset options ([7bd4d56](https://github.com/think-bro/rag-ingestion-pipeline/commit/7bd4d568ee9b72220216d2aa6a338cbeda50df0f))
+* Implement vector database indexing pipeline ([b14442d](https://github.com/think-bro/rag-ingestion-pipeline/commit/b14442deec8477f430887fc337b1554d1653ed56))
+
 ## [0.6.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.5.0...frontend-v0.6.0) (2026-07-17)
 
 
