@@ -22,7 +22,10 @@ from apps.backend.app.features.chunk_document.controller import (
     ChunkPresetController,
 )
 from apps.backend.app.features.chunk_document.service import ChunkDocumentService
-from apps.backend.app.features.embed_document.controller import EmbedDocumentController
+from apps.backend.app.features.embed_document.controller import (
+    EmbedDocumentController,
+    EmbedModelsController,
+)
 from apps.backend.app.features.embed_document.service import EmbedDocumentService
 import redis.asyncio as aioredis
 
@@ -99,6 +102,7 @@ def create_app() -> Litestar:
             ChunkDocumentController,
             ChunkPresetController,
             EmbedDocumentController,
+            EmbedModelsController,
         ],
     )
     api_router = Router(path="/api", route_handlers=[v1_router])

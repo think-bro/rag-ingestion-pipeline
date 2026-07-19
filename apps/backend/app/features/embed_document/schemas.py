@@ -18,9 +18,14 @@ class TaskStatus(enum.StrEnum):
     CANCELLED = "cancelled"
 
 
+class SupportedEmbedModels(enum.StrEnum):
+    MULTILINGUAL_E5_LARGE = embed_settings.default_model_name
+
+
 class EmbedConfig(BaseModel):
-    # TODO: Add other embedding models and make them selectable via UI
-    model_name: str = Field(default=embed_settings.default_model_name)
+    model_name: SupportedEmbedModels = Field(
+        default=SupportedEmbedModels.MULTILINGUAL_E5_LARGE
+    )
 
 
 class EmbedItem(BaseModel):
@@ -31,6 +36,7 @@ class EmbedItem(BaseModel):
 class EmbedRequest(BaseModel):
     file_id: str
     filename: str
+    config: EmbedConfig = Field(default_factory=EmbedConfig)
 
 
 class EmbedTaskResponse(BaseModel):

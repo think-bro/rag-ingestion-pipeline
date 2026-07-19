@@ -11,6 +11,7 @@ from .schemas import (
     TaskStatus,
 )
 from .service import EmbedDocumentService
+from .config import settings as embed_settings
 
 logger = structlog.get_logger()
 
@@ -124,3 +125,12 @@ class EmbedDocumentController(Controller):
             filename=filename,
             content_disposition_type="attachment",
         )
+
+
+class EmbedModelsController(Controller):
+    path = "/embed-models"
+
+    @get()
+    async def list_embed_models(self) -> list[dict[str, str]]:
+        """Retrieves a list of all supported embedding models."""
+        return embed_settings.supported_models

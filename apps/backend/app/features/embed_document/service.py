@@ -11,7 +11,6 @@ from .schemas import (
     TaskStatus,
     EmbedTaskResponse,
     EmbedItem,
-    EmbedConfig,
 )
 from .tasks import embed_task
 
@@ -40,7 +39,7 @@ class EmbedDocumentService:
         stat = await path_obj.stat()
         file_size = stat.st_size
 
-        config = EmbedConfig()
+        config = request.config
 
         total_vectors = 0
         try:
