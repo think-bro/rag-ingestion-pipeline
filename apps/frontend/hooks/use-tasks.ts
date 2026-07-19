@@ -16,11 +16,13 @@ export function useTasks() {
     queryKey: TASKS_QUERY_KEY,
     queryFn: async (): Promise<CombinedTask[]> => {
       // Fetch all tasks in parallel
-      const [parsingTasks, chunkingTasks, embeddingTasks] = await Promise.all([
-        api.getParseTasks().catch(() => []),
-        api.getChunkTasks().catch(() => []),
-        api.getEmbedTasks().catch(() => []),
-      ]);
+      const [parsingTasks, chunkingTasks, embeddingTasks, indexTasks] =
+        await Promise.all([
+          api.getParseTasks().catch(() => []),
+          api.getChunkTasks().catch(() => []),
+          api.getEmbedTasks().catch(() => []),
+          api.getIndexTasks().catch(() => []),
+        ]);
 
       // Map and tag them
       const combined: CombinedTask[] = [
@@ -29,6 +31,10 @@ export function useTasks() {
         ...embeddingTasks.map((t) => ({
           ...t,
           task_type: "embedding" as const,
+        })),
+        ...indexTasks.map((t) => ({
+          ...t,
+          task_type: "indexing" as const,
         })),
       ];
 
@@ -79,13 +85,22 @@ export function useSubmitTask() {
       formatOrPreset,
       customMetadata,
       presetData,
+      embedModel,
+      indexConfig,
     }: {
       fileId: string;
       filename: string;
-      action?: "parse" | "chunk" | "embed";
+      action?: "parse" | "chunk" | "embed" | "index";
       formatOrPreset?: string;
       customMetadata?: Record<string, string>;
       presetData?: Preset;
+      embedModel?: string;
+      indexConfig?: {
+        db_name: string;
+        url: string;
+        collection_name: string;
+        embedding_dim?: number;
+      };
     }) =>
       api.submitTask(
         fileId,
@@ -93,7 +108,9 @@ export function useSubmitTask() {
         action,
         formatOrPreset,
         customMetadata,
-        presetData
+        presetData,
+        embedModel,
+        indexConfig
       ),
     onSuccess: () => {
       // Invalidate the tasks query so it immediately refetches the new list
@@ -114,8 +131,11 @@ export function useDeleteTask() {
       taskType,
     }: {
       taskId: string;
-      taskType: "parsing" | "chunking" | "embedding";
+      taskType: "parsing" | "chunking" | "embedding" | "indexing";
     }) => {
+      if (taskType === "indexing") {
+        return api.deleteIndexTask(taskId);
+      }
       if (taskType === "embedding") {
         return api.deleteEmbedTask(taskId);
       }
@@ -142,8 +162,11 @@ export function useCancelTask() {
       taskType,
     }: {
       taskId: string;
-      taskType: "parsing" | "chunking" | "embedding";
+      taskType: "parsing" | "chunking" | "embedding" | "indexing";
     }) => {
+      if (taskType === "indexing") {
+        return api.cancelIndexTask(taskId);
+      }
       if (taskType === "embedding") {
         return api.cancelEmbedTask(taskId);
       }

@@ -2,11 +2,11 @@ import { create } from "zustand";
 
 interface TaskState {
   activeTaskId: string | null;
-  activeTaskType: "parsing" | "chunking" | "embedding" | null;
+  activeTaskType: "parsing" | "chunking" | "embedding" | "indexing" | null;
   isNewIngestionModalOpen: boolean;
   setActiveTask: (
     id: string | null,
-    type?: "parsing" | "chunking" | "embedding" | null
+    type?: "parsing" | "chunking" | "embedding" | "indexing" | null
   ) => void;
   setNewIngestionModalOpen: (open: boolean) => void;
 }

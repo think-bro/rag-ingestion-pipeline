@@ -120,10 +120,41 @@ export interface EmbedTaskResponse {
   total_vectors?: number;
 }
 
+export interface IndexConfig {
+  collection_name: string;
+  db_name: string;
+  embedding_dim?: number;
+  url: string;
+}
+
+export interface IndexItem {
+  chunk_id: string;
+  metadata: {
+    chunk_index: number;
+    [key: string]: unknown;
+  };
+}
+
+export interface IndexTaskResponse {
+  completed_vectors?: number;
+  config?: IndexConfig;
+  created_at?: string;
+  error?: string;
+  file_size?: number;
+  filename?: string;
+  items?: IndexItem[];
+  processing_time?: number;
+  status: TaskStatus;
+  task_id: string;
+  task_type: "indexing";
+  total_vectors?: number;
+}
+
 export type CombinedTask =
   | ParseTaskResponse
   | ChunkTaskResponse
-  | EmbedTaskResponse;
+  | EmbedTaskResponse
+  | IndexTaskResponse;
 
 const BASE_URL =
   process.env.NODE_ENV === "development"
@@ -192,18 +223,20 @@ export const api = {
   async submitTask(
     fileId: string,
     filename: string,
-    action: "parse" | "chunk" | "embed" = "parse",
+    action: "parse" | "chunk" | "embed" | "index" = "parse",
     formatOrPreset?: string,
     customMetadata?: Record<string, string>,
     presetData?: Preset,
-    embedModel?: string
+    embedModel?: string,
+    indexConfig?: IndexConfig
   ): Promise<{ task_id: string; status: string; message: string }> {
     let endpoint = `${BASE_URL}/parse-tasks`;
     if (action === "chunk") {
       endpoint = `${BASE_URL}/chunk-tasks`;
-    }
-    if (action === "embed") {
+    } else if (action === "embed") {
       endpoint = `${BASE_URL}/embed-tasks`;
+    } else if (action === "index") {
+      endpoint = `${BASE_URL}/index-tasks`;
     }
 
     let body: Record<string, unknown>;
@@ -227,6 +260,12 @@ export const api = {
         file_id: fileId,
         filename,
         config: embedModel ? { model_name: embedModel } : undefined,
+      };
+    } else if (action === "index") {
+      body = {
+        file_id: fileId,
+        filename,
+        config: indexConfig,
       };
     } else {
       body = {
@@ -428,6 +467,55 @@ export const api = {
     const res = await fetch(`${BASE_URL}/embed-models`);
     if (!res.ok) {
       throw new Error(`Failed to fetch embed models: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  // --- Indexing Endpoints ---
+
+  async getIndexTasks(): Promise<IndexTaskResponse[]> {
+    const res = await fetch(`${BASE_URL}/index-tasks`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch index tasks: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async getIndexTaskResult(taskId: string): Promise<IndexTaskResponse> {
+    const res = await fetch(`${BASE_URL}/index-tasks/${taskId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch index task result: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async deleteIndexTask(taskId: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/index-tasks/${taskId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to delete index task: ${res.statusText}`);
+    }
+  },
+
+  async cancelIndexTask(
+    taskId: string
+  ): Promise<{ task_id: string; status: string; message: string }> {
+    const res = await fetch(`${BASE_URL}/index-tasks/${taskId}/cancel`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to cancel index task: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async getVectorDBs(): Promise<
+    { id: string; name: string; default_url?: string }[]
+  > {
+    const res = await fetch(`${BASE_URL}/vector-dbs`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch vector dbs: ${res.statusText}`);
     }
     return res.json();
   },

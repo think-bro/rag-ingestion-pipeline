@@ -6,8 +6,8 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { ItemCard } from "@/components/item-card";
 import { StateCard } from "@/components/state-card";
+import { TaskItemList } from "@/components/task-item-list";
 import { TaskMasterCard } from "@/components/task-master-card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -19,17 +19,16 @@ import {
   useDownloadEmbedFull,
   useEmbeddingTaskDetailData,
 } from "@/hooks/use-embedding-tasks";
+import { useIndexingTaskDetailData } from "@/hooks/use-indexing-tasks";
 import {
   useDownloadParseFull,
   useParsingTaskDetailData,
 } from "@/hooks/use-parsing-tasks";
 import type {
-  ChunkItem,
   ChunkTaskResponse,
-  EmbedItem,
   EmbedTaskResponse,
+  IndexTaskResponse,
   ParseTaskResponse,
-  PartResponse,
 } from "@/lib/api";
 import { useTaskStore } from "@/store/task-store";
 
@@ -79,16 +78,40 @@ function TaskErrorState({
   );
 }
 
+const TASK_UI_CONFIG = {
+  parsing: {
+    itemTerm: "Parts",
+    itemTermLower: "parts",
+    downloadLabel: "Download as MARKDOWN",
+  },
+  chunking: {
+    itemTerm: "Chunks",
+    itemTermLower: "chunks",
+    downloadLabel: "Download as JSON",
+  },
+  embedding: {
+    itemTerm: "Vectors",
+    itemTermLower: "vectors",
+    downloadLabel: "Download as PARQUET",
+  },
+  indexing: {
+    itemTerm: "Indexes",
+    itemTermLower: "indexes",
+    downloadLabel: "Open your database",
+  },
+};
+
 export function TaskDetailView({
   taskId,
   taskType = "parsing",
 }: {
   taskId: string;
-  taskType?: "parsing" | "chunking" | "embedding";
+  taskType?: "parsing" | "chunking" | "embedding" | "indexing";
 }) {
   const isParsingTask = taskType === "parsing";
   const isChunkingTask = taskType === "chunking";
   const isEmbeddingTask = taskType === "embedding";
+  const isIndexingTask = taskType === "indexing";
 
   const parsingDetail = useParsingTaskDetailData(isParsingTask ? taskId : null);
   const chunkingDetail = useChunkingTaskDetailData(
@@ -98,14 +121,21 @@ export function TaskDetailView({
     isEmbeddingTask ? taskId : null
   );
 
+  const indexingDetail = useIndexingTaskDetailData(
+    isIndexingTask ? taskId : null
+  );
+
   let detail:
     | ReturnType<typeof useParsingTaskDetailData>
     | ReturnType<typeof useChunkingTaskDetailData>
-    | ReturnType<typeof useEmbeddingTaskDetailData>;
+    | ReturnType<typeof useEmbeddingTaskDetailData>
+    | ReturnType<typeof useIndexingTaskDetailData>;
   if (isParsingTask) {
     detail = parsingDetail;
   } else if (isEmbeddingTask) {
     detail = embeddingDetail;
+  } else if (isIndexingTask) {
+    detail = indexingDetail;
   } else {
     detail = chunkingDetail;
   }
@@ -145,8 +175,10 @@ export function TaskDetailView({
 
   const data = rawData as Omit<ParseTaskResponse, "task_type"> &
     Omit<ChunkTaskResponse, "task_type"> &
-    Omit<EmbedTaskResponse, "task_type">;
+    Omit<EmbedTaskResponse, "task_type"> &
+    Omit<IndexTaskResponse, "task_type">;
   const isEmbedding = taskType === "embedding";
+  const isIndexing = taskType === "indexing";
 
   const handleDownloadFull = () => {
     if (isParsing) {
@@ -163,23 +195,13 @@ export function TaskDetailView({
     isDownloading = downloadParseMutation.isPending;
   } else if (isEmbedding) {
     isDownloading = downloadEmbedMutation.isPending;
+  } else if (isIndexing) {
+    isDownloading = false;
   } else {
     isDownloading = downloadChunksMutation.isPending;
   }
 
-  let itemTerm = "Chunks";
-  let itemTermLower = "chunks";
-  let downloadLabel = "Download as JSON";
-  if (isParsing) {
-    itemTerm = "Parts";
-    itemTermLower = "parts";
-    downloadLabel = "Download as MARKDOWN";
-  } else if (isEmbedding) {
-    itemTerm = "Vectors";
-    itemTermLower = "vectors";
-    downloadLabel = "Download as PARQUET";
-  }
-
+  const { itemTerm, itemTermLower, downloadLabel } = TASK_UI_CONFIG[taskType];
   const isTaskProcessing = ["pending", "processing", "cancelling"].includes(
     data.status
   );
@@ -208,61 +230,31 @@ export function TaskDetailView({
             <h3 className="font-semibold text-lg">
               {itemTerm} ({total})
             </h3>
-            <Button
-              className="cursor-pointer"
-              disabled={
-                isTaskProcessing ||
-                completed === 0 ||
-                isDownloading ||
-                data.status === "failed"
-              }
-              onClick={handleDownloadFull}
-            >
-              <Download />
-              <span className="text-nowrap">{downloadLabel}</span>
-            </Button>
-          </div>
-          <div className="flex flex-col gap-3">
-            {items
-              ?.slice(0, isParsing ? 50 : undefined)
-              .map((item, idx: number) => {
-                if (isParsing) {
-                  const parseItem = item as PartResponse;
-                  return (
-                    <ItemCard
-                      item={parseItem}
-                      key={parseItem.part_index}
-                      taskId={taskId}
-                      type="parse"
-                    />
-                  );
+            {/* TODO: Implement a feature to create and download a snapshot of the vector database for indexing tasks */}
+            {!isIndexing && (
+              <Button
+                className="cursor-pointer"
+                disabled={
+                  isTaskProcessing ||
+                  completed === 0 ||
+                  isDownloading ||
+                  data.status === "failed"
                 }
-                if (isEmbedding) {
-                  const embedItem = item as EmbedItem;
-                  return (
-                    <ItemCard
-                      item={embedItem}
-                      key={embedItem.chunk_id || idx}
-                      type="embed"
-                    />
-                  );
-                }
-                const chunkItem = item as ChunkItem;
-                return (
-                  <ItemCard
-                    item={chunkItem}
-                    key={chunkItem.chunk_id || idx}
-                    type="chunk"
-                  />
-                );
-              })}
-            {!isParsing && items && total > 50 && (
-              <div className="mt-2 text-center text-muted-foreground text-sm">
-                + {total - (items?.length || 0)} more {itemTermLower} not shown.{" "}
-                {downloadLabel} to view all.
-              </div>
+                onClick={handleDownloadFull}
+              >
+                <Download />
+                <span className="text-nowrap">{downloadLabel}</span>
+              </Button>
             )}
           </div>
+          <TaskItemList
+            downloadLabel={downloadLabel}
+            items={items}
+            itemTermLower={itemTermLower}
+            taskId={taskId}
+            taskType={taskType}
+            total={total}
+          />
         </div>
 
         {data.status === "failed" && (
