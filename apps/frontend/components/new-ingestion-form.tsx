@@ -15,7 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { VectorDbInputs } from "@/components/vector-db-inputs";
 import { useEmbedModels } from "@/hooks/use-embedding-tasks";
+import { useIndexDBs } from "@/hooks/use-indexing-tasks";
 import { useIngestionSubmit } from "@/hooks/use-ingestion-submit";
 import { usePresets, useSubmitTask } from "@/hooks/use-tasks";
 import { useUploadItems } from "@/hooks/use-upload-items";
@@ -28,6 +30,7 @@ const TASK_OPTIONS = [
   { label: "Parsing", value: "parse" },
   { label: "Chunking", value: "chunk" },
   { label: "Embedding", value: "embed" },
+  { label: "Indexing", value: "index" },
 ] as const;
 
 function getErrorMessage(
@@ -55,12 +58,19 @@ function getErrorMessage(
     return "Invalid file. Please ensure it is a JSON (.json) file.";
   }
 
+  if (taskType === "index") {
+    return "Invalid file. Please ensure it is a Parquet (.parquet) file.";
+  }
+
   return "Invalid file. Please ensure it is a PDF under 512MB.";
 }
 
 function getAcceptedFiles(
   taskType: string
 ): Record<string, string[]> | undefined {
+  if (taskType === "index") {
+    return { "application/vnd.apache.parquet": [".parquet"] };
+  }
   if (taskType === "embed") {
     return { "application/json": [".json"] };
   }
@@ -76,7 +86,8 @@ function getAcceptedFiles(
 function getMissingSelectionMessage(
   taskType: string,
   preset: string,
-  embedModel: string
+  embedModel: string,
+  vectorDb: string
 ): string | null {
   if (taskType === "unselected") {
     return "Please select a Task Type first";
@@ -87,23 +98,30 @@ function getMissingSelectionMessage(
   if (taskType === "embed" && embedModel === "unselected") {
     return "Please select an Embedding Model first";
   }
+  if (taskType === "index" && vectorDb === "unselected") {
+    return "Please select a Vector Database first";
+  }
   return null;
 }
 
 function getDropzoneSubtitle(taskType: string): string {
+  if (taskType === "index") {
+    return "Parquet documents up to 512MB";
+  }
   if (taskType === "chunk") {
-    return "Markdown documents up to 100MB";
+    return "Markdown documents up to 512MB";
   }
   if (taskType === "embed") {
-    return "JSON documents up to 100MB";
+    return "JSON documents up to 512MB";
   }
-  return "PDF documents up to 100MB";
+  return "PDF documents up to 512MB";
 }
 
 function isDropzoneDisabled(
   taskType: string,
   preset: string,
   embedModel: string,
+  vectorDb: string,
   itemCount: number,
   isFormPending: boolean
 ): boolean {
@@ -122,6 +140,30 @@ function isDropzoneDisabled(
   if (taskType === "embed" && embedModel === "unselected") {
     return true;
   }
+  if (taskType === "index" && vectorDb === "unselected") {
+    return true;
+  }
+  return false;
+}
+
+function isDropzoneVisualDisabled(
+  taskType: string,
+  preset: string,
+  embedModel: string,
+  vectorDb: string
+): boolean {
+  if (taskType === "unselected") {
+    return true;
+  }
+  if (taskType === "chunk" && preset === "unselected") {
+    return true;
+  }
+  if (taskType === "embed" && embedModel === "unselected") {
+    return true;
+  }
+  if (taskType === "index" && vectorDb === "unselected") {
+    return true;
+  }
   return false;
 }
 
@@ -136,7 +178,7 @@ export function NewIngestionForm({
     hasFiles: boolean;
     isUploading: boolean;
     isSubmitting: boolean;
-    taskType: "unselected" | "parse" | "chunk" | "embed";
+    taskType: "unselected" | "parse" | "chunk" | "embed" | "index";
     preset: string;
   }) => void;
 }) {
@@ -151,15 +193,22 @@ export function NewIngestionForm({
   const setPreset = useFormStore((s) => s.setPreset);
   const embedModel = useFormStore((s) => s.embedModel);
   const setEmbedModel = useFormStore((s) => s.setEmbedModel);
+  const vectorDb = useFormStore((s) => s.vectorDb);
+  const setVectorDb = useFormStore((s) => s.setVectorDb);
   const format = useFormStore((s) => s.format);
   const [customMetadata, setCustomMetadata] = useState<Record<string, string>>(
     {}
   );
+  const vectorDbUrl = useFormStore((s) => s.vectorDbUrl);
+  const setVectorDbUrl = useFormStore((s) => s.setVectorDbUrl);
+  const vectorDbCollection = useFormStore((s) => s.vectorDbCollection);
+  const setVectorDbCollection = useFormStore((s) => s.setVectorDbCollection);
 
   const isUploading = items.some((i) => i.status === "uploading");
   const isFormPending = isPending || isUploading;
   const { data: embedModels, isLoading: isLoadingEmbedModels } =
     useEmbedModels();
+  const { data: indexDBs, isLoading: isLoadingIndexDBs } = useIndexDBs();
 
   useEffect(() => {
     onStateChange?.({
@@ -180,6 +229,7 @@ export function NewIngestionForm({
         taskType,
         preset,
         embedModel,
+        vectorDb,
         items.length,
         isFormPending
       ),
@@ -202,6 +252,9 @@ export function NewIngestionForm({
     taskType,
     preset,
     embedModel,
+    vectorDb,
+    vectorDbUrl,
+    vectorDbCollection,
     format,
     customMetadata,
     onSuccess,
@@ -218,9 +271,9 @@ export function NewIngestionForm({
         <div className="col-span-full sm:col-span-3">
           <Select
             disabled={isFormPending}
-            onValueChange={(v: "unselected" | "parse" | "chunk" | "embed") =>
-              setTaskType(v)
-            }
+            onValueChange={(
+              v: "unselected" | "parse" | "chunk" | "embed" | "index"
+            ) => setTaskType(v)}
             value={taskType}
           >
             <SelectTrigger className="w-full" id="task-type">
@@ -310,12 +363,59 @@ export function NewIngestionForm({
           </div>
         )}
 
+        {taskType === "index" && (
+          <div className="col-span-full sm:col-span-3">
+            <Select
+              disabled={isFormPending}
+              onValueChange={(v: string) => {
+                setVectorDb(v);
+                const db = indexDBs?.find((d) => d.id === v);
+                if (db?.default_url) {
+                  setVectorDbUrl(db.default_url);
+                }
+              }}
+              value={vectorDb}
+            >
+              <SelectTrigger className="w-full" id="vector-db">
+                <SelectValue placeholder="Select vector database" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Databases</SelectLabel>
+                  <SelectItem value="unselected">Select a Database</SelectItem>
+                  {isLoadingIndexDBs ? (
+                    <SelectItem disabled value="loading">
+                      Loading...
+                    </SelectItem>
+                  ) : (
+                    (indexDBs || []).map((db) => (
+                      <SelectItem key={db.id} value={db.id}>
+                        {db.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <CustomMetadataSelects
           CHUNK_PRESETS={CHUNK_PRESETS}
           isFormPending={isFormPending}
           preset={preset}
           setCustomMetadata={setCustomMetadata}
           taskType={taskType}
+        />
+
+        <VectorDbInputs
+          isFormPending={isFormPending}
+          setVectorDbCollection={setVectorDbCollection}
+          setVectorDbUrl={setVectorDbUrl}
+          taskType={taskType}
+          vectorDb={vectorDb}
+          vectorDbCollection={vectorDbCollection}
+          vectorDbUrl={vectorDbUrl}
         />
 
         <div className="col-span-full">
@@ -328,9 +428,7 @@ export function NewIngestionForm({
               isDragActive
                 ? "border-primary bg-primary/10 ring-2 ring-primary/20"
                 : "border-border",
-              taskType === "unselected" ||
-                (taskType === "chunk" && preset === "unselected") ||
-                (taskType === "embed" && embedModel === "unselected")
+              isDropzoneVisualDisabled(taskType, preset, embedModel, vectorDb)
                 ? "cursor-not-allowed bg-muted/50 opacity-60"
                 : "",
               "mt-2 flex justify-center rounded-md border border-dashed px-6 py-20 transition-colors duration-200"
@@ -342,9 +440,19 @@ export function NewIngestionForm({
                 className="mx-auto h-12 w-12 text-muted-foreground/80"
               />
               <div className="mt-4 flex flex-col items-center text-muted-foreground">
-                {getMissingSelectionMessage(taskType, preset, embedModel) ? (
+                {getMissingSelectionMessage(
+                  taskType,
+                  preset,
+                  embedModel,
+                  vectorDb
+                ) ? (
                   <p className="font-medium text-foreground text-sm">
-                    {getMissingSelectionMessage(taskType, preset, embedModel)}
+                    {getMissingSelectionMessage(
+                      taskType,
+                      preset,
+                      embedModel,
+                      vectorDb
+                    )}
                   </p>
                 ) : (
                   <div className="flex">
@@ -358,8 +466,12 @@ export function NewIngestionForm({
                 )}
               </div>
               <p className="mt-2 text-center text-muted-foreground/70 text-xs">
-                {getMissingSelectionMessage(taskType, preset, embedModel) ??
-                  getDropzoneSubtitle(taskType)}
+                {getMissingSelectionMessage(
+                  taskType,
+                  preset,
+                  embedModel,
+                  vectorDb
+                ) ?? getDropzoneSubtitle(taskType)}
               </p>
               {errorMessage && (
                 <p className="mt-3 text-center text-destructive text-sm">

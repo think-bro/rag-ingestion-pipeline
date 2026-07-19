@@ -16,6 +16,7 @@ class CoreSettings(BaseSettings):
     parses_dir: Path = STORAGE_DIR / "parses"
     chunks_dir: Path = STORAGE_DIR / "chunks"
     vectors_dir: Path = STORAGE_DIR / "vectors"
+    indexes_dir: Path = STORAGE_DIR / "indexes"
 
     cancel_key_prefix: str = "cancel_task:"
     cancel_key_ttl: int = 3600  # 1 hour
@@ -38,3 +39,4 @@ settings.parts_dir.mkdir(parents=True, exist_ok=True)
 settings.parses_dir.mkdir(parents=True, exist_ok=True)
 settings.chunks_dir.mkdir(parents=True, exist_ok=True)
 settings.vectors_dir.mkdir(parents=True, exist_ok=True)
+settings.indexes_dir.mkdir(parents=True, exist_ok=True)

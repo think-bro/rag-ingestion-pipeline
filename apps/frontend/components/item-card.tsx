@@ -8,13 +8,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useRetryPart } from "@/hooks/use-parsing-tasks";
-import type { ChunkItem, EmbedItem, PartResponse } from "@/lib/api";
+import type { ChunkItem, EmbedItem, IndexItem, PartResponse } from "@/lib/api";
 import { formatProcessingTime } from "@/lib/utils";
 
 export type ItemCardProps =
   | { type: "parse"; item: PartResponse; taskId: string }
   | { type: "chunk"; item: ChunkItem }
-  | { type: "embed"; item: EmbedItem };
+  | { type: "embed"; item: EmbedItem }
+  | { type: "index"; item: IndexItem };
 
 export function ItemCard(props: ItemCardProps) {
   // const downloadMutation = useDownloadPart();
@@ -79,13 +80,25 @@ export function ItemCard(props: ItemCardProps) {
               </span>
             </>
           )}
+
+          {props.type === "index" && (
+            <>
+              <span className="font-semibold text-sm">
+                Index #
+                {String(props.item.metadata.chunk_index + 1).padStart(3, "0")}
+              </span>
+              <span className="text-muted-foreground text-sm">
+                Point ID: {props.item.chunk_id}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center">
           {props.type === "parse" && <StatusBadge status={props.item.status} />}
-          {(props.type === "chunk" || props.type === "embed") && (
-            <StatusBadge status={"completed"} />
-          )}
+          {(props.type === "chunk" ||
+            props.type === "embed" ||
+            props.type === "index") && <StatusBadge status={"completed"} />}
 
           {props.type === "parse" && props.item.status === "failed" && (
             <div className="flex w-0 items-center justify-end overflow-hidden opacity-0 transition-all duration-300 group-hover:ml-2 group-hover:w-8 group-hover:opacity-100">

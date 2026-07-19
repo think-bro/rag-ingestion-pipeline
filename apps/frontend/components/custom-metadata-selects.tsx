@@ -16,7 +16,7 @@ export function CustomMetadataSelects({
   isFormPending,
   setCustomMetadata,
 }: {
-  taskType: "unselected" | "parse" | "chunk" | "embed";
+  taskType: "unselected" | "parse" | "chunk" | "embed" | "index";
   preset: string;
   CHUNK_PRESETS?: PresetsResponse;
   isFormPending: boolean;

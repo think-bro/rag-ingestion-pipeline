@@ -31,7 +31,7 @@ interface TaskItemProps {
   isMobile: boolean;
   onSelectTask: (
     id: string,
-    type: "parsing" | "chunking" | "embedding"
+    type: "parsing" | "chunking" | "embedding" | "indexing"
   ) => void;
   task: CombinedTask;
 }

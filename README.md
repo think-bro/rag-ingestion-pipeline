@@ -1,15 +1,15 @@
 # RAG Ingestion Pipeline
 
-An asynchronous document ingestion pipeline for RAG (Retrieval-Augmented Generation) workflows.
+An opinionated, local-first, asynchronous document ingestion pipeline for RAG (Retrieval-Augmented Generation) workflows.
 
 ## Overview
 This project processes raw documents (like PDFs, etc.) and prepares them for vector search. It is structured as a monorepo containing a Litestar backend and a Next.js frontend, with TaskIQ handling async processing.
 
 **Pipeline Stages:**
 1. **Parsing:** Extracts structured content from raw documents using Docling. Outputs structured Markdown.
-2. **Chunking:** Splits the parsed document into hierarchical and token-aware recursive chunks using LangChain and Chonkie. Outputs flattened JSON ready for vector ingestion.
+2. **Chunking:** Splits the parsed document into hierarchical and token-aware recursive chunks using LangChain and Chonkie.
 3. **Embedding:** Generating vector embeddings for chunks using FastEmbed, saving output as Parquet.
-4. **Vector Storage (Planned):** Indexing the embeddings into a Vector Database.
+4. **Indexing:** Indexing the embeddings directly into a Vector Database.
 
 ## Tech Stack
 - **Backend Framework:** [Litestar](https://github.com/litestar-org/litestar) (Python 3.14)
@@ -19,6 +19,7 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 - **Document Parsing:** [Docling](https://github.com/docling-project/docling)
 - **Document Chunking:** [Chonkie](https://github.com/feyninc/chonkie) and [LangChain](https://github.com/langchain-ai/langchain)
 - **Vector Embedding:** [FastEmbed](https://github.com/qdrant/fastembed) and [PyArrow](https://github.com/apache/arrow)
+- **Vector Indexing:**  [Qdrant](https://github.com/qdrant/qdrant) and [Qdrant Client](https://github.com/qdrant/qdrant-client)
 - **State Management:** [Zustand](https://github.com/pmndrs/zustand), [TanStack Query](https://github.com/TanStack/query)
 - **Containerization:** [Docker](https://www.docker.com/)
 - **Backend Package Management:** [uv](https://github.com/astral-sh/uv)

@@ -1,11 +1,98 @@
 import type { UploadItem } from "@/hooks/use-upload-items";
-import type { Preset, PresetsResponse } from "@/lib/api";
+import type { IndexConfig, Preset, PresetsResponse } from "@/lib/api";
+
+function isValidSubmission(
+  taskType: string,
+  successfulItems: UploadItem[],
+  preset: string,
+  embedModel?: string,
+  vectorDb?: string
+) {
+  if (successfulItems.length === 0 || taskType === "unselected") {
+    return false;
+  }
+  if (taskType === "chunk" && preset === "unselected") {
+    return false;
+  }
+  if (taskType === "embed" && embedModel === "unselected") {
+    return false;
+  }
+  if (taskType === "index" && vectorDb === "unselected") {
+    return false;
+  }
+  return true;
+}
+
+function buildTaskPayload(
+  item: UploadItem,
+  taskType: "unselected" | "parse" | "chunk" | "embed" | "index",
+  format: string,
+  preset: string,
+  customMetadata: Record<string, string>,
+  embedModel?: string,
+  vectorDb?: string,
+  vectorDbUrl?: string,
+  vectorDbCollection?: string,
+  CHUNK_PRESETS?: PresetsResponse
+) {
+  if (!item.uploadResponse) {
+    throw new Error("Missing upload response");
+  }
+
+  const basePayload = {
+    fileId: item.uploadResponse.file_id,
+    filename: item.uploadResponse.filename,
+    action: taskType as "parse" | "chunk" | "embed" | "index",
+  };
+
+  if (taskType === "chunk") {
+    return {
+      ...basePayload,
+      formatOrPreset: preset,
+      customMetadata,
+      presetData: CHUNK_PRESETS ? CHUNK_PRESETS[preset] : undefined,
+    };
+  }
+
+  if (taskType === "embed") {
+    return {
+      ...basePayload,
+      embedModel,
+    };
+  }
+
+  if (taskType === "index") {
+    return {
+      ...basePayload,
+      indexConfig: {
+        db_name: vectorDb || "",
+        url: vectorDbUrl || "",
+        collection_name: vectorDbCollection || "",
+      },
+    };
+  }
+
+  return {
+    ...basePayload,
+    formatOrPreset: format,
+  };
+}
+
+const TASK_TYPE_MAP = {
+  parse: "parsing",
+  chunk: "chunking",
+  embed: "embedding",
+  index: "indexing",
+} as const;
 
 export function useIngestionSubmit({
   items,
   taskType,
   preset,
   embedModel,
+  vectorDb,
+  vectorDbUrl,
+  vectorDbCollection,
   format,
   customMetadata,
   onSuccess,
@@ -16,20 +103,24 @@ export function useIngestionSubmit({
   setActiveTask,
 }: {
   items: UploadItem[];
-  taskType: "unselected" | "parse" | "chunk" | "embed";
+  taskType: "unselected" | "parse" | "chunk" | "embed" | "index";
   preset: string;
   embedModel?: string;
+  vectorDb?: string;
+  vectorDbUrl?: string;
+  vectorDbCollection?: string;
   format: string;
   customMetadata: Record<string, string>;
   onSuccess: () => void;
   mutateAsync: (args: {
     fileId: string;
     filename: string;
-    action?: "parse" | "chunk" | "embed";
+    action?: "parse" | "chunk" | "embed" | "index";
     formatOrPreset?: string;
     embedModel?: string;
     customMetadata?: Record<string, string>;
     presetData?: Preset;
+    indexConfig?: IndexConfig;
   }) => Promise<{ task_id: string }>;
   CHUNK_PRESETS?: PresetsResponse;
   setItems: (
@@ -38,7 +129,7 @@ export function useIngestionSubmit({
   setNewIngestionModalOpen: (open: boolean) => void;
   setActiveTask: (
     id: string,
-    type: "parsing" | "chunking" | "embedding"
+    type: "parsing" | "chunking" | "embedding" | "indexing"
   ) => void;
 }) {
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,32 +137,34 @@ export function useIngestionSubmit({
     const successfulItems = items.filter(
       (i) => i.status === "success" && i.uploadResponse
     );
+
     if (
-      successfulItems.length === 0 ||
-      taskType === "unselected" ||
-      (taskType === "chunk" && preset === "unselected") ||
-      (taskType === "embed" && embedModel === "unselected")
+      !isValidSubmission(
+        taskType,
+        successfulItems,
+        preset,
+        embedModel,
+        vectorDb
+      )
     ) {
       return;
     }
 
     try {
       const uploadPromises = successfulItems.map((item) => {
-        if (!item.uploadResponse) {
-          throw new Error("Missing upload response");
-        }
-        return mutateAsync({
-          fileId: item.uploadResponse.file_id,
-          filename: item.uploadResponse.filename,
-          action: taskType,
-          formatOrPreset: taskType === "chunk" ? preset : format,
-          embedModel: taskType === "embed" ? embedModel : undefined,
-          customMetadata: taskType === "chunk" ? customMetadata : undefined,
-          presetData:
-            taskType === "chunk" && CHUNK_PRESETS
-              ? CHUNK_PRESETS[preset]
-              : undefined,
-        });
+        const payload = buildTaskPayload(
+          item,
+          taskType,
+          format,
+          preset,
+          customMetadata,
+          embedModel,
+          vectorDb,
+          vectorDbUrl,
+          vectorDbCollection,
+          CHUNK_PRESETS
+        );
+        return mutateAsync(payload);
       });
       const results = await Promise.all(uploadPromises);
 
@@ -79,14 +172,8 @@ export function useIngestionSubmit({
       onSuccess();
       setNewIngestionModalOpen(false);
 
-      if (results.length > 0) {
-        let activeType: "parsing" | "chunking" | "embedding" = "chunking";
-        if (taskType === "embed") {
-          activeType = "embedding";
-        } else if (taskType === "parse") {
-          activeType = "parsing";
-        }
-        setActiveTask(results[0].task_id, activeType);
+      if (results.length > 0 && taskType !== "unselected") {
+        setActiveTask(results[0].task_id, TASK_TYPE_MAP[taskType]);
       }
     } catch (error) {
       if (error instanceof Error) {

@@ -27,6 +27,11 @@ from apps.backend.app.features.embed_document.controller import (
     EmbedModelsController,
 )
 from apps.backend.app.features.embed_document.service import EmbedDocumentService
+from apps.backend.app.features.index_document.controller import (
+    IndexDocumentController,
+    VectorDBsController,
+)
+from apps.backend.app.features.index_document.service import IndexDocumentService
 import redis.asyncio as aioredis
 
 
@@ -55,12 +60,16 @@ async def app_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
     app.state.embed_document_service = EmbedDocumentService(
         redis=app.state.redis,
     )
+    app.state.index_document_service = IndexDocumentService(
+        redis=app.state.redis,
+    )
     yield
 
     del app.state.upload_service
     del app.state.parse_document_service
     del app.state.chunk_document_service
     del app.state.embed_document_service
+    del app.state.index_document_service
 
     await app.state.redis_pool.disconnect()
     del app.state.redis
@@ -90,6 +99,11 @@ def provide_embed_document_service(state: State) -> EmbedDocumentService:
     return state.embed_document_service
 
 
+def provide_index_document_service(state: State) -> IndexDocumentService:
+    """Dependency provider for IndexDocumentService using the global instance."""
+    return state.index_document_service
+
+
 def create_app() -> Litestar:
     """Application factory function."""
     cors_config = CORSConfig(allow_origins=["*"])
@@ -103,6 +117,8 @@ def create_app() -> Litestar:
             ChunkPresetController,
             EmbedDocumentController,
             EmbedModelsController,
+            IndexDocumentController,
+            VectorDBsController,
         ],
     )
     api_router = Router(path="/api", route_handlers=[v1_router])
@@ -136,6 +152,9 @@ def create_app() -> Litestar:
             ),
             "embed_document_service": Provide(
                 provide_embed_document_service, sync_to_thread=False
+            ),
+            "index_document_service": Provide(
+                provide_index_document_service, sync_to_thread=False
             ),
         },
         cors_config=cors_config,
