@@ -174,11 +174,19 @@ export const api = {
   },
 
   async getPresets(): Promise<PresetsResponse> {
-    const res = await fetch(`${BASE_URL}/presets`);
+    const res = await fetch(`${BASE_URL}/chunk-presets`);
     if (!res.ok) {
       throw new Error(`Failed to fetch presets: ${res.statusText}`);
     }
-    return res.json();
+    const data = await res.json();
+
+    const record: PresetsResponse = {};
+    if (data.presets && Array.isArray(data.presets)) {
+      for (const p of data.presets) {
+        record[p.id] = p;
+      }
+    }
+    return record;
   },
 
   async submitTask(
