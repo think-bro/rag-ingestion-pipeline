@@ -11,7 +11,15 @@ from apps.backend.app.core.config import (
     CANCEL_KEY_PREFIX,
     CANCEL_KEY_TTL,
 )
-from .schemas import ChunkRequest, TaskStatus, ChunkTaskResponse, ChunkItem
+from .schemas import (
+    ChunkRequest,
+    TaskStatus,
+    ChunkTaskResponse,
+    ChunkItem,
+    ChunkPresetSummary,
+    ChunkPresetListResponse,
+)
+from .presets import CHUNK_PRESETS
 from .tasks import chunk_task
 
 logger = structlog.get_logger()
@@ -39,7 +47,14 @@ class ChunkDocumentService:
         stat = await path_obj.stat()
         file_size = stat.st_size
 
-        config_dict = request.config.model_dump()
+        effective_config = request.config
+        if request.preset_id:
+            preset = CHUNK_PRESETS.get(request.preset_id)
+            if preset is None:
+                raise ValueError(f"Unknown preset_id: {request.preset_id}")
+            effective_config = preset.build_config(base=request.config)
+
+        config_dict = effective_config.model_dump()
 
         pending_data = {
             "task_id": task_id,
@@ -176,3 +191,18 @@ class ChunkDocumentService:
         if await content_path.exists():
             return content_path
         return None
+
+    def list_presets(self) -> ChunkPresetListResponse:
+        """Returns all presets available for this feature."""
+        return ChunkPresetListResponse(
+            presets=[
+                ChunkPresetSummary(
+                    id=preset_id,
+                    name=preset.name,
+                    description=preset.description,
+                    metadata_options=preset.metadata_options,
+                    config_overrides=preset.config_overrides,
+                )
+                for preset_id, preset in CHUNK_PRESETS.items()
+            ]
+        )

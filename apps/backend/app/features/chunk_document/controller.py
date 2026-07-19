@@ -9,6 +9,7 @@ from .schemas import (
     ChunkTaskResponse,
     ChunkTaskListDTO,
     TaskStatus,
+    ChunkPresetListResponse,
 )
 from .service import ChunkDocumentService
 
@@ -124,3 +125,15 @@ class ChunkDocumentController(Controller):
             filename=filename,
             content_disposition_type="attachment",
         )
+
+
+class ChunkPresetController(Controller):
+    path = "/chunk-presets"
+
+    @get()
+    async def list_chunk_presets(
+        self,
+        chunk_document_service: ChunkDocumentService,
+    ) -> ChunkPresetListResponse:
+        """Retrieves a list of all document chunking presets."""
+        return chunk_document_service.list_presets()

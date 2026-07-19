@@ -16,11 +16,13 @@ from apps.backend.app.features.upload_document.controller import (
 from apps.backend.app.features.upload_document.service import UploadDocumentService
 from apps.backend.app.features.parse_document.controller import ParseDocumentController
 from apps.backend.app.features.parse_document.service import ParseDocumentService
-from apps.backend.app.features.chunk_document.controller import ChunkDocumentController
+from apps.backend.app.features.chunk_document.controller import (
+    ChunkDocumentController,
+    ChunkPresetController,
+)
 from apps.backend.app.features.chunk_document.service import ChunkDocumentService
 from apps.backend.app.features.embed_document.controller import EmbedDocumentController
 from apps.backend.app.features.embed_document.service import EmbedDocumentService
-from apps.backend.app.features.get_presets.controller import GetPresetsController
 import redis.asyncio as aioredis
 
 
@@ -94,7 +96,7 @@ def create_app() -> Litestar:
             UploadDocumentController,
             ParseDocumentController,
             ChunkDocumentController,
-            GetPresetsController,
+            ChunkPresetController,
             EmbedDocumentController,
         ],
     )
