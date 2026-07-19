@@ -9,7 +9,7 @@ import pypdfium2 as pdfium
 
 
 from apps.backend.app.core.config import (
-    RESULTS_DIR,
+    PARSES_DIR,
     UPLOAD_DIR,
     PARTS_DIR,
     CANCEL_KEY_PREFIX,
@@ -252,9 +252,9 @@ class ParseDocumentService:
                 await self.redis.delete(*keys)
 
             # Clean up disk files (.md, .pdf, and merged files)
-            for file_path in RESULTS_DIR.glob(f"{task_id}_part_*.md"):
+            for file_path in PARSES_DIR.glob(f"{task_id}_part_*.md"):
                 await Path(file_path).unlink(missing_ok=True)
-            await Path(RESULTS_DIR / f"{task_id}_merged.md").unlink(missing_ok=True)
+            await Path(PARSES_DIR / f"{task_id}_merged.md").unlink(missing_ok=True)
             for file_path in PARTS_DIR.glob(f"{task_id}_part_*.pdf"):
                 await Path(file_path).unlink(missing_ok=True)
 
@@ -331,7 +331,7 @@ class ParseDocumentService:
 
     async def download_part_content(self, task_id: str, part_index: int) -> Path | None:
         """Returns the path to a part's markdown file if it exists."""
-        content_path = Path(RESULTS_DIR / f"{task_id}_part_{part_index:03d}.md")
+        content_path = Path(PARSES_DIR / f"{task_id}_part_{part_index:03d}.md")
         if await content_path.exists():
             return content_path
         return None
@@ -342,7 +342,7 @@ class ParseDocumentService:
         if not task_data:
             return None
 
-        merged_path = Path(RESULTS_DIR / f"{task_id}_merged.md")
+        merged_path = Path(PARSES_DIR / f"{task_id}_merged.md")
         if await merged_path.exists():
             return merged_path
 
@@ -353,7 +353,7 @@ class ParseDocumentService:
         # Merge all completed parts into a single file
         async with await open_file(merged_path, "w", encoding="utf-8") as out:
             for i in range(total_parts):
-                part_path = Path(RESULTS_DIR / f"{task_id}_part_{i:03d}.md")
+                part_path = Path(PARSES_DIR / f"{task_id}_part_{i:03d}.md")
                 if await part_path.exists():
                     async with await open_file(part_path, "r", encoding="utf-8") as f:
                         await out.write(await f.read())

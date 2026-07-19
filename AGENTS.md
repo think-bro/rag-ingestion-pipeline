@@ -26,7 +26,7 @@ apps/
 │   │   ├── main.py                  # App factory, lifespan, DI, CORS
 │   │   ├── core/
 │   │   │   ├── broker.py            # TaskIQ broker + Redis result backend
-│   │   │   └── config.py            # Storage paths (UPLOAD_DIR, RESULTS_DIR)
+│   │   │   └── config.py            # Storage paths (UPLOAD_DIR, PARSES_DIR)
 │   │   └── features/
 │   │       ├── upload_document/     # File uploads
 │   │       ├── chunk_document/      # Hierarchical and recursive chunking
@@ -293,7 +293,7 @@ For long-running operations (e.g., document parsing), the backend uses an **asyn
 
 **Important Files:**
 - `apps/backend/app/core/broker.py`: Centralized definition for the TaskIQ broker and result backend.
-- `apps/backend/app/core/config.py`: Storage path configuration (`UPLOAD_DIR`, `RESULTS_DIR`).
+- `apps/backend/app/core/config.py`: Storage path configuration (`UPLOAD_DIR`, `PARSES_DIR`).
 - `apps/backend/app/features/parse_document/tasks.py`: Contains parsing TaskIQ tasks (`@broker.task()`).
 - `apps/backend/app/features/chunk_document/tasks.py`: Contains chunking TaskIQ tasks (`@broker.task()`).
 - `apps/backend/app/features/embed_document/tasks.py`: Contains embedding TaskIQ tasks (`@broker.task()`).

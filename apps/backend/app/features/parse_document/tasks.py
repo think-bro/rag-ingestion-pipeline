@@ -12,7 +12,7 @@ from taskiq import Context, TaskiqDepends
 import json
 from apps.backend.app.core.broker import broker
 from apps.backend.app.core.config import (
-    RESULTS_DIR,
+    PARSES_DIR,
     UPLOAD_DIR,
     CANCEL_KEY_PREFIX,
     SUBPROCESS_POLL_INTERVAL,
@@ -82,8 +82,8 @@ async def parse_part_task(
 
     start_time = time.perf_counter()
     parsed_content = ""
-    output_json_path = str(RESULTS_DIR / f"{task_id}_part_{part_index:03d}_temp.json")
-    result_path = RESULTS_DIR / f"{task_id}_part_{part_index:03d}.md"
+    output_json_path = str(PARSES_DIR / f"{task_id}_part_{part_index:03d}_temp.json")
+    result_path = PARSES_DIR / f"{task_id}_part_{part_index:03d}.md"
 
     part_status = PartStatus.FAILED.value
     error_msg = None

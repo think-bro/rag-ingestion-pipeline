@@ -7,12 +7,14 @@ WORKSPACE_DIR = os.getenv("WORKSPACE_DIR")
 BASE_DIR = Path(WORKSPACE_DIR) if WORKSPACE_DIR else Path.cwd()
 STORAGE_DIR = BASE_DIR / "storage"
 UPLOAD_DIR = STORAGE_DIR / "uploads"
-RESULTS_DIR = STORAGE_DIR / "results"
+PARTS_DIR = STORAGE_DIR / "parts"
+PARSES_DIR = STORAGE_DIR / "parses"
 CHUNKS_DIR = STORAGE_DIR / "chunks"
 EMBEDDINGS_DIR = STORAGE_DIR / "embeddings"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+PARTS_DIR.mkdir(parents=True, exist_ok=True)
+PARSES_DIR.mkdir(parents=True, exist_ok=True)
 CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
 EMBEDDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -25,5 +27,3 @@ SUBPROCESS_TERMINATE_TIMEOUT = 3.0  # seconds
 # PDF Splitting Configuration
 SPLIT_THRESHOLD = int(os.getenv("SPLIT_THRESHOLD", "10"))
 PAGES_PER_PART = int(os.getenv("PAGES_PER_PART", "10"))
-PARTS_DIR = STORAGE_DIR / "parts"
-PARTS_DIR.mkdir(parents=True, exist_ok=True)
