@@ -9,6 +9,7 @@ from litestar.middleware.logging import LoggingMiddlewareConfig
 from litestar.plugins.structlog import StructlogConfig, StructlogPlugin
 
 from apps.backend.app.core.broker import broker
+from apps.backend.app.core.config import settings as core_settings
 from apps.backend.app.core.redis_client import get_redis_pool
 from apps.backend.app.features.upload_document.controller import (
     UploadDocumentController,
@@ -134,9 +135,7 @@ def create_app() -> Litestar:
             ),
         },
         cors_config=cors_config,
-        request_max_body_size=512
-        * 1024
-        * 1024,  # TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
+        request_max_body_size=core_settings.max_upload_size_bytes,  # TODO: Move synchronous PDF splitting to a TaskIQ background task to prevent API blocking
         debug=True,
     )
 

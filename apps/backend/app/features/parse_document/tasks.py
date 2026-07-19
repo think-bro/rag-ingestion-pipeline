@@ -11,14 +11,9 @@ from taskiq import Context, TaskiqDepends
 
 import json
 from apps.backend.app.core.broker import broker
-from apps.backend.app.core.config import (
-    PARSES_DIR,
-    UPLOAD_DIR,
-    CANCEL_KEY_PREFIX,
-    SUBPROCESS_POLL_INTERVAL,
-    SUBPROCESS_TERMINATE_TIMEOUT,
-)
-from apps.backend.app.features.parse_document.schemas import TaskStatus, PartStatus
+from apps.backend.app.core.config import settings as core_settings
+from .schemas import TaskStatus, PartStatus
+from .config import settings as parse_settings
 
 
 logger = structlog.get_logger()
@@ -50,7 +45,7 @@ async def parse_part_task(
     )
 
     # 1. Pre-emptive cancel check
-    cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
+    cancel_key = f"{core_settings.cancel_key_prefix}{task_id}"
     if await redis.exists(cancel_key):
         logger.info(
             "part_task_cancelled_before_start", task_id=task_id, part_index=part_index
@@ -82,8 +77,10 @@ async def parse_part_task(
 
     start_time = time.perf_counter()
     parsed_content = ""
-    output_json_path = str(PARSES_DIR / f"{task_id}_part_{part_index:03d}_temp.json")
-    result_path = PARSES_DIR / f"{task_id}_part_{part_index:03d}.md"
+    output_json_path = str(
+        core_settings.parses_dir / f"{task_id}_part_{part_index:03d}_temp.json"
+    )
+    result_path = core_settings.parses_dir / f"{task_id}_part_{part_index:03d}.md"
 
     part_status = PartStatus.FAILED.value
     error_msg = None
@@ -102,7 +99,9 @@ async def parse_part_task(
         # Polling loop
         while True:
             try:
-                await asyncio.wait_for(process.wait(), timeout=SUBPROCESS_POLL_INTERVAL)
+                await asyncio.wait_for(
+                    process.wait(), timeout=core_settings.subprocess_poll_interval
+                )
                 break  # Process finished
             except asyncio.TimeoutError:
                 pass  # Poll interval expired, check cancel flag
@@ -117,7 +116,8 @@ async def parse_part_task(
                 process.terminate()
                 try:
                     await asyncio.wait_for(
-                        process.wait(), timeout=SUBPROCESS_TERMINATE_TIMEOUT
+                        process.wait(),
+                        timeout=core_settings.subprocess_terminate_timeout,
                     )
                 except asyncio.TimeoutError:
                     process.kill()
@@ -242,7 +242,7 @@ async def parse_part_task(
     }
 
 
-@broker.task(schedule=[{"cron": "0 * * * *"}])
+@broker.task(schedule=[{"cron": parse_settings.orphan_cleanup_cron}])
 async def cleanup_orphaned_uploads_task() -> dict:
     """
     TaskIQ cron task: Cleans up files in the uploads directory that are older than 24 hours
@@ -251,15 +251,15 @@ async def cleanup_orphaned_uploads_task() -> dict:
     logger.info("started_cleanup_orphaned_uploads_task")
     deleted_count = 0
     now = time.time()
-    twenty_four_hours_ago = now - (24 * 60 * 60)
+    time_limit_ago = now - parse_settings.orphan_upload_max_age_seconds
 
-    path_obj = Path(UPLOAD_DIR)
+    path_obj = Path(core_settings.upload_dir)
     if await path_obj.exists():
         async for file in path_obj.iterdir():
             if await file.is_file():
                 try:
                     stat = await file.stat()
-                    if stat.st_mtime < twenty_four_hours_ago:
+                    if stat.st_mtime < time_limit_ago:
                         await file.unlink(missing_ok=True)
                         deleted_count += 1
                         logger.info("deleted_orphaned_upload", file=str(file))

@@ -10,6 +10,8 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter
 from chonkie import RecursiveChunker, OverlapRefinery
 from chonkie.types import Chunk
 
+from .config import settings as chunk_settings
+
 
 def handle_sigterm(signum, frame):
     """Handle SIGTERM signal by exiting gracefully with an error JSON."""
@@ -50,21 +52,24 @@ def main() -> None:
         docs = splitter.split_text(md_text)
 
         # ── Stage 2: Chonkie RecursiveChunker ──
-        tokenizer_id = config.get("tokenizer_id", "intfloat/multilingual-e5-large")
+        tokenizer_id = config.get("tokenizer_id", chunk_settings.default_tokenizer_id)
         tokenizer_obj = HFTokenizer.from_pretrained(tokenizer_id)
 
-        overlap_val = config.get("chunk_overlap", 128)
+        chunk_size = config.get("chunk_size", chunk_settings.default_chunk_size)
+        overlap_val = config.get("chunk_overlap", chunk_settings.default_chunk_overlap)
 
         # In Chonkie, OverlapRefinery *adds* context to the chunk. To stay under the max
         # embedding token limit (chunk_size), the base chunker must leave room for the overlap.
-        base_chunk_size = config["chunk_size"] - overlap_val
+        base_chunk_size = chunk_size - overlap_val
         if base_chunk_size <= 0:
-            base_chunk_size = config["chunk_size"]  # Fallback just in case
+            base_chunk_size = chunk_size  # Fallback just in case
 
         chunker = RecursiveChunker(
             tokenizer=tokenizer_obj,
             chunk_size=base_chunk_size,
-            min_characters_per_chunk=config.get("min_characters_per_chunk", 24),
+            min_characters_per_chunk=config.get(
+                "min_chars_per_chunk", chunk_settings.default_min_chars_per_chunk
+            ),
         )
 
         if overlap_val > 0:
@@ -135,9 +140,9 @@ def main() -> None:
         with open(args.output_json_path, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
 
-        # Generate preview JSON (max 50 items)
+        # Generate preview JSON
         preview_items = []
-        for c in result[:50]:
+        for c in result[: chunk_settings.max_preview_items]:
             preview_items.append(
                 {
                     "chunk_id": c.get("chunk_id", ""),

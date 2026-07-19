@@ -10,13 +10,8 @@ from taskiq import Context, TaskiqDepends
 import json
 
 from apps.backend.app.core.broker import broker
-from apps.backend.app.core.config import (
-    EMBEDDINGS_DIR,
-    CANCEL_KEY_PREFIX,
-    SUBPROCESS_POLL_INTERVAL,
-    SUBPROCESS_TERMINATE_TIMEOUT,
-)
-from apps.backend.app.features.embed_document.schemas import TaskStatus
+from apps.backend.app.core.config import settings as core_settings
+from .schemas import TaskStatus
 
 logger = structlog.get_logger()
 
@@ -38,7 +33,7 @@ async def embed_task(
 
     logger.info("started_embed_task", task_id=task_id)
 
-    cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
+    cancel_key = f"{core_settings.cancel_key_prefix}{task_id}"
     if await redis.exists(cancel_key):
         logger.info("embed_task_cancelled_before_start", task_id=task_id)
         await redis.hset(f"embed_task:{task_id}", "status", TaskStatus.CANCELLED.value)
@@ -48,11 +43,11 @@ async def embed_task(
 
     await redis.hset(f"embed_task:{task_id}", "status", TaskStatus.PROCESSING.value)
 
-    output_parquet_path = str(EMBEDDINGS_DIR / f"{task_id}_temp.parquet")
-    output_preview_path = str(EMBEDDINGS_DIR / f"{task_id}_preview.json")
-    final_output_path = EMBEDDINGS_DIR / f"{task_id}.parquet"
-    error_json_path = str(EMBEDDINGS_DIR / f"{task_id}_error.json")
-    progress_json_path = str(EMBEDDINGS_DIR / f"{task_id}_progress.json")
+    output_parquet_path = str(core_settings.vectors_dir / f"{task_id}_temp.parquet")
+    output_preview_path = str(core_settings.vectors_dir / f"{task_id}_preview.json")
+    final_output_path = core_settings.vectors_dir / f"{task_id}.parquet"
+    error_json_path = str(core_settings.vectors_dir / f"{task_id}_error.json")
+    progress_json_path = str(core_settings.vectors_dir / f"{task_id}_progress.json")
 
     task_status = TaskStatus.FAILED.value
     error_msg = None
@@ -73,7 +68,9 @@ async def embed_task(
 
         while True:
             try:
-                await asyncio.wait_for(process.wait(), timeout=SUBPROCESS_POLL_INTERVAL)
+                await asyncio.wait_for(
+                    process.wait(), timeout=core_settings.subprocess_poll_interval
+                )
                 break
             except asyncio.TimeoutError:
                 if os.path.exists(progress_json_path):
@@ -101,7 +98,8 @@ async def embed_task(
                 process.terminate()
                 try:
                     await asyncio.wait_for(
-                        process.wait(), timeout=SUBPROCESS_TERMINATE_TIMEOUT
+                        process.wait(),
+                        timeout=core_settings.subprocess_terminate_timeout,
                     )
                 except asyncio.TimeoutError:
                     process.kill()

@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from litestar.dto import DTOConfig
 from litestar.contrib.pydantic import PydanticDTO
 
+from .config import settings as embed_settings
+
 
 class TaskStatus(enum.StrEnum):
     PENDING = "pending"
@@ -18,7 +20,7 @@ class TaskStatus(enum.StrEnum):
 
 class EmbedConfig(BaseModel):
     # TODO: Add other embedding models and make them selectable via UI
-    model_name: str = Field(default="intfloat/multilingual-e5-large")
+    model_name: str = Field(default=embed_settings.default_model_name)
 
 
 class EmbedItem(BaseModel):

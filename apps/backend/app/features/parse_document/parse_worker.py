@@ -6,6 +6,8 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
+from .config import settings as parse_settings
+
 
 def handle_sigterm(signum, frame):
     """Handle SIGTERM signal by exiting gracefully with an error JSON."""
@@ -24,11 +26,10 @@ def main():
     signal.signal(signal.SIGTERM, handle_sigterm)
 
     try:
-        # TODO: Make OCR and image generation toggles configurable via the frontend UI
         pipeline_options = PdfPipelineOptions(
-            do_ocr=False,
-            generate_picture_images=False,
-            generate_page_images=False,
+            do_ocr=parse_settings.docling_do_ocr,
+            generate_page_images=parse_settings.docling_generate_page_images,
+            generate_picture_images=parse_settings.docling_generate_picture_images,
         )
 
         converter = DocumentConverter(

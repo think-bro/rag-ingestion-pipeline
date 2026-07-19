@@ -5,12 +5,7 @@ from typing import Any
 import structlog
 from anyio import Path
 
-from apps.backend.app.core.config import (
-    UPLOAD_DIR,
-    EMBEDDINGS_DIR,
-    CANCEL_KEY_PREFIX,
-    CANCEL_KEY_TTL,
-)
+from apps.backend.app.core.config import settings as core_settings
 from .schemas import (
     EmbedRequest,
     TaskStatus,
@@ -34,7 +29,7 @@ class EmbedDocumentService:
         if ".." in file_id or "/" in file_id or "\\" in file_id:
             raise ValueError("Invalid file_id")
 
-        file_path = UPLOAD_DIR / file_id
+        file_path = core_settings.upload_dir / file_id
         path_obj = Path(file_path)
 
         if not await path_obj.exists():
@@ -103,7 +98,7 @@ class EmbedDocumentService:
         response = EmbedTaskResponse(**task_data)
 
         if response.status == TaskStatus.COMPLETED:
-            preview_path = EMBEDDINGS_DIR / f"{task_id}_preview.json"
+            preview_path = core_settings.vectors_dir / f"{task_id}_preview.json"
             if await Path(preview_path).exists():
                 with open(preview_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -156,8 +151,16 @@ class EmbedDocumentService:
         """Deletes a task and its resulting chunk file from storage."""
         try:
             await self.redis.delete(f"embed_task:{task_id}")
-            await Path(EMBEDDINGS_DIR / f"{task_id}.parquet").unlink(missing_ok=True)
-            await Path(EMBEDDINGS_DIR / f"{task_id}_preview.json").unlink(
+            await Path(core_settings.vectors_dir / f"{task_id}.parquet").unlink(
+                missing_ok=True
+            )
+            await Path(core_settings.vectors_dir / f"{task_id}_preview.json").unlink(
+                missing_ok=True
+            )
+            await Path(core_settings.vectors_dir / f"{task_id}_error.json").unlink(
+                missing_ok=True
+            )
+            await Path(core_settings.vectors_dir / f"{task_id}_progress.json").unlink(
                 missing_ok=True
             )
             logger.info("deleted_embed_task_result", task_id=task_id)
@@ -180,8 +183,8 @@ class EmbedDocumentService:
         ]:
             return False
 
-        cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
-        await self.redis.set(cancel_key, "1", ex=CANCEL_KEY_TTL)
+        cancel_key = f"{core_settings.cancel_key_prefix}{task_id}"
+        await self.redis.set(cancel_key, "1", ex=core_settings.cancel_key_ttl)
 
         await self.redis.hset(
             f"embed_task:{task_id}", "status", TaskStatus.CANCELLING.value
@@ -192,7 +195,7 @@ class EmbedDocumentService:
 
     async def download_embeddings(self, task_id: str) -> Path | None:
         """Returns the path to the completed embeddings parquet file."""
-        content_path = Path(EMBEDDINGS_DIR / f"{task_id}.parquet")
+        content_path = Path(core_settings.vectors_dir / f"{task_id}.parquet")
         if await content_path.exists():
             return content_path
         return None

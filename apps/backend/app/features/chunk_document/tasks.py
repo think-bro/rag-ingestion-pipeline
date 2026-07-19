@@ -10,13 +10,8 @@ from taskiq import Context, TaskiqDepends
 import json
 
 from apps.backend.app.core.broker import broker
-from apps.backend.app.core.config import (
-    CHUNKS_DIR,
-    CANCEL_KEY_PREFIX,
-    SUBPROCESS_POLL_INTERVAL,
-    SUBPROCESS_TERMINATE_TIMEOUT,
-)
-from apps.backend.app.features.chunk_document.schemas import TaskStatus
+from apps.backend.app.core.config import settings as core_settings
+from .schemas import TaskStatus
 
 logger = structlog.get_logger()
 
@@ -38,7 +33,7 @@ async def chunk_task(
 
     logger.info("started_chunk_task", task_id=task_id)
 
-    cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
+    cancel_key = f"{core_settings.cancel_key_prefix}{task_id}"
     if await redis.exists(cancel_key):
         logger.info("chunk_task_cancelled_before_start", task_id=task_id)
         await redis.hset(f"chunk_task:{task_id}", "status", TaskStatus.CANCELLED.value)
@@ -48,9 +43,9 @@ async def chunk_task(
 
     await redis.hset(f"chunk_task:{task_id}", "status", TaskStatus.PROCESSING.value)
 
-    output_json_path = str(CHUNKS_DIR / f"{task_id}_chunks_temp.json")
-    final_output_path = CHUNKS_DIR / f"{task_id}_chunks.json"
-    output_preview_path = str(CHUNKS_DIR / f"{task_id}_preview.json")
+    output_json_path = str(core_settings.chunks_dir / f"{task_id}_chunks_temp.json")
+    final_output_path = core_settings.chunks_dir / f"{task_id}_chunks.json"
+    output_preview_path = str(core_settings.chunks_dir / f"{task_id}_preview.json")
 
     task_status = TaskStatus.FAILED.value
     error_msg = None
@@ -70,7 +65,9 @@ async def chunk_task(
 
         while True:
             try:
-                await asyncio.wait_for(process.wait(), timeout=SUBPROCESS_POLL_INTERVAL)
+                await asyncio.wait_for(
+                    process.wait(), timeout=core_settings.subprocess_poll_interval
+                )
                 break
             except asyncio.TimeoutError:
                 pass
@@ -80,7 +77,8 @@ async def chunk_task(
                 process.terminate()
                 try:
                     await asyncio.wait_for(
-                        process.wait(), timeout=SUBPROCESS_TERMINATE_TIMEOUT
+                        process.wait(),
+                        timeout=core_settings.subprocess_terminate_timeout,
                     )
                 except asyncio.TimeoutError:
                     process.kill()

@@ -5,12 +5,7 @@ import json
 import structlog
 from anyio import Path
 
-from apps.backend.app.core.config import (
-    UPLOAD_DIR,
-    CHUNKS_DIR,
-    CANCEL_KEY_PREFIX,
-    CANCEL_KEY_TTL,
-)
+from apps.backend.app.core.config import settings as core_settings
 from .schemas import (
     ChunkRequest,
     TaskStatus,
@@ -36,7 +31,7 @@ class ChunkDocumentService:
         if ".." in file_id or "/" in file_id or "\\" in file_id:
             raise ValueError("Invalid file_id")
 
-        file_path = UPLOAD_DIR / file_id
+        file_path = core_settings.upload_dir / file_id
         path_obj = Path(file_path)
 
         if not await path_obj.exists():
@@ -102,7 +97,7 @@ class ChunkDocumentService:
         response = ChunkTaskResponse(**task_data)
 
         if response.status == TaskStatus.COMPLETED:
-            preview_path = CHUNKS_DIR / f"{task_id}_preview.json"
+            preview_path = core_settings.chunks_dir / f"{task_id}_preview.json"
             if await Path(preview_path).exists():
                 with open(preview_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -153,8 +148,12 @@ class ChunkDocumentService:
         """Deletes a task and its resulting chunk file from storage."""
         try:
             await self.redis.delete(f"chunk_task:{task_id}")
-            await Path(CHUNKS_DIR / f"{task_id}_chunks.json").unlink(missing_ok=True)
-            await Path(CHUNKS_DIR / f"{task_id}_preview.json").unlink(missing_ok=True)
+            await Path(core_settings.chunks_dir / f"{task_id}_chunks.json").unlink(
+                missing_ok=True
+            )
+            await Path(core_settings.chunks_dir / f"{task_id}_preview.json").unlink(
+                missing_ok=True
+            )
             logger.info("deleted_chunk_task_result", task_id=task_id)
         except Exception as e:
             logger.error(
@@ -175,8 +174,8 @@ class ChunkDocumentService:
         ]:
             return False
 
-        cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
-        await self.redis.set(cancel_key, "1", ex=CANCEL_KEY_TTL)
+        cancel_key = f"{core_settings.cancel_key_prefix}{task_id}"
+        await self.redis.set(cancel_key, "1", ex=core_settings.cancel_key_ttl)
 
         await self.redis.hset(
             f"chunk_task:{task_id}", "status", TaskStatus.CANCELLING.value
@@ -187,7 +186,7 @@ class ChunkDocumentService:
 
     async def download_chunks(self, task_id: str) -> Path | None:
         """Returns the path to the completed chunks JSON file."""
-        content_path = Path(CHUNKS_DIR / f"{task_id}_chunks.json")
+        content_path = Path(core_settings.chunks_dir / f"{task_id}_chunks.json")
         if await content_path.exists():
             return content_path
         return None

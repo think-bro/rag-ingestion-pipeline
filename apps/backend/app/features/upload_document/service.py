@@ -6,7 +6,7 @@ from anyio import Path, open_file, to_thread
 import pypdfium2 as pdfium
 from litestar.datastructures import UploadFile
 
-from apps.backend.app.core.config import UPLOAD_DIR
+from apps.backend.app.core.config import settings as core_settings
 from .schemas import UploadResponse
 
 logger = structlog.get_logger()
@@ -20,7 +20,7 @@ class UploadDocumentService:
         if not ext:
             ext = ".pdf"
         save_filename = f"{file_uuid}{ext}"
-        save_path = UPLOAD_DIR / save_filename
+        save_path = core_settings.upload_dir / save_filename
 
         file_size = 0
         async with await open_file(save_path, "wb") as out_file:
@@ -56,7 +56,7 @@ class UploadDocumentService:
         if ".." in file_id or "/" in file_id or "\\" in file_id:
             raise ValueError("Invalid file_id")
 
-        file_path = UPLOAD_DIR / file_id
+        file_path = core_settings.upload_dir / file_id
         path_obj = Path(file_path)
         try:
             await path_obj.unlink(missing_ok=True)

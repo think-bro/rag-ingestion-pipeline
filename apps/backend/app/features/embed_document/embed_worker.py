@@ -7,6 +7,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from fastembed import TextEmbedding
 
+from apps.backend.app.core.config import settings as core_settings
+from .config import settings as embed_settings
+
 
 def handle_sigterm(signum, frame):
     """Handle SIGTERM signal by exiting gracefully with an error JSON."""
@@ -45,9 +48,9 @@ def main():
             write_error(args.error_json_path, "No chunks found in input file")
             sys.exit(1)
 
-        model_name = config.get("model_name", "intfloat/multilingual-e5-large")
+        model_name = config.get("model_name", embed_settings.default_model_name)
         embedding_model = TextEmbedding(
-            model_name=model_name, cache_dir="/workspace/models/hf/hub"
+            model_name=model_name, cache_dir=core_settings.hf_models_cache_dir
         )
 
         # Prepare texts
@@ -59,10 +62,13 @@ def main():
             json.dump(progress_data, f)
 
         embeddings_list = []
-        for i, vector in enumerate(embedding_model.embed(texts, batch_size=8), start=1):
+        for i, vector in enumerate(
+            embedding_model.embed(texts, batch_size=embed_settings.embed_batch_size),
+            start=1,
+        ):
             embeddings_list.append(vector)
 
-            if i % 8 == 0 or i == total_chunks:
+            if i % embed_settings.embed_batch_size == 0 or i == total_chunks:
                 progress_data["completed"] = i
                 with open(args.progress_json_path, "w", encoding="utf-8") as f:
                     json.dump(progress_data, f)
@@ -87,9 +93,9 @@ def main():
 
         pq.write_table(table, args.output_parquet_path)
 
-        # Generate preview JSON (max 50 items)
+        # Generate preview JSON
         preview_items = []
-        for i, c in enumerate(chunks[:50]):
+        for i, c in enumerate(chunks[: embed_settings.max_preview_items]):
             preview_items.append(
                 {
                     "chunk_id": c.get("chunk_id", ""),

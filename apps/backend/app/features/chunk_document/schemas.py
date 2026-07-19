@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from litestar.dto import DTOConfig
 from litestar.contrib.pydantic import PydanticDTO
 
+from .config import settings as chunk_settings
+
 
 class TaskStatus(enum.StrEnum):
     PENDING = "pending"
@@ -17,18 +19,16 @@ class TaskStatus(enum.StrEnum):
 
 
 class ChunkConfig(BaseModel):
-    # TODO: Add other tokenizer options (e.g. gpt2, cl100k_base) and make them selectable via UI
-    tokenizer_id: str = Field(default="intfloat/multilingual-e5-large")
-    chunk_size: int = Field(default=512, ge=64, le=8192)
-    chunk_overlap: int = Field(default=64, ge=0, le=2048)
-    min_characters_per_chunk: int = Field(default=24, ge=1)
+    tokenizer_id: str = Field(default=chunk_settings.default_tokenizer_id)
+    chunk_size: int = Field(default=chunk_settings.default_chunk_size, ge=64, le=8192)
+    chunk_overlap: int = Field(
+        default=chunk_settings.default_chunk_overlap, ge=0, le=2048
+    )
+    min_characters_per_chunk: int = Field(
+        default=chunk_settings.default_min_chars_per_chunk, ge=1
+    )
     headers_to_split_on: list[tuple[str, str]] = Field(
-        default_factory=lambda: [
-            ("#", "Header 1"),
-            ("##", "Header 2"),
-            ("###", "Header 3"),
-            ("####", "Header 4"),
-        ]
+        default_factory=lambda: list(chunk_settings.default_headers_to_split_on)
     )
     strip_headers: bool = False
     custom_metadata: dict[str, str] = Field(default_factory=dict)

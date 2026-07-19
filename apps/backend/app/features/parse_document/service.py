@@ -8,14 +8,8 @@ from anyio import Path, open_file, to_thread
 import pypdfium2 as pdfium
 
 
-from apps.backend.app.core.config import (
-    PARSES_DIR,
-    UPLOAD_DIR,
-    PARTS_DIR,
-    CANCEL_KEY_PREFIX,
-    CANCEL_KEY_TTL,
-    PAGES_PER_PART,
-)
+from apps.backend.app.core.config import settings as core_settings
+from .config import settings as parse_settings
 from .schemas import (
     ParseTaskResponse,
     TaskStatus,
@@ -42,16 +36,16 @@ class ParseDocumentService:
             pdf = pdfium.PdfDocument(path)
             total_pages = len(pdf)
 
-            for start_idx in range(0, total_pages, PAGES_PER_PART):
-                end_idx = min(start_idx + PAGES_PER_PART, total_pages)
-                part_index = start_idx // PAGES_PER_PART
+            for start_idx in range(0, total_pages, parse_settings.pages_per_part):
+                end_idx = min(start_idx + parse_settings.pages_per_part, total_pages)
+                part_index = start_idx // parse_settings.pages_per_part
 
                 new_pdf = pdfium.PdfDocument.new()
                 # page indices are 0-based
                 pages_to_import = list(range(start_idx, end_idx))
                 new_pdf.import_pages(pdf, pages=pages_to_import)
 
-                out_path = PARTS_DIR / f"{t_id}_part_{part_index:03d}.pdf"
+                out_path = core_settings.parts_dir / f"{t_id}_part_{part_index:03d}.pdf"
                 new_pdf.save(str(out_path))
                 new_pdf.close()
 
@@ -80,7 +74,7 @@ class ParseDocumentService:
         if ".." in file_id or "/" in file_id or "\\" in file_id:
             raise ValueError("Invalid file_id")
 
-        file_path = UPLOAD_DIR / file_id
+        file_path = core_settings.upload_dir / file_id
         path_obj = Path(file_path)
 
         if not await path_obj.exists():
@@ -252,10 +246,12 @@ class ParseDocumentService:
                 await self.redis.delete(*keys)
 
             # Clean up disk files (.md, .pdf, and merged files)
-            for file_path in PARSES_DIR.glob(f"{task_id}_part_*.md"):
+            for file_path in core_settings.parses_dir.glob(f"{task_id}_part_*.md"):
                 await Path(file_path).unlink(missing_ok=True)
-            await Path(PARSES_DIR / f"{task_id}_merged.md").unlink(missing_ok=True)
-            for file_path in PARTS_DIR.glob(f"{task_id}_part_*.pdf"):
+            await Path(core_settings.parses_dir / f"{task_id}_merged.md").unlink(
+                missing_ok=True
+            )
+            for file_path in core_settings.parts_dir.glob(f"{task_id}_part_*.pdf"):
                 await Path(file_path).unlink(missing_ok=True)
 
             logger.info("deleted_task_result", task_id=task_id)
@@ -277,8 +273,8 @@ class ParseDocumentService:
             return False
 
         # Set the cancellation flag in Redis
-        cancel_key = f"{CANCEL_KEY_PREFIX}{task_id}"
-        await self.redis.set(cancel_key, "1", ex=CANCEL_KEY_TTL)
+        cancel_key = f"{core_settings.cancel_key_prefix}{task_id}"
+        await self.redis.set(cancel_key, "1", ex=core_settings.cancel_key_ttl)
 
         # Update task status to cancelling
         await self.redis.hset(f"task:{task_id}", "status", TaskStatus.CANCELLING.value)
@@ -298,7 +294,7 @@ class ParseDocumentService:
             return False
 
         # Check if PDF part exists
-        out_path = PARTS_DIR / f"{task_id}_part_{part_index:03d}.pdf"
+        out_path = core_settings.parts_dir / f"{task_id}_part_{part_index:03d}.pdf"
         if not await Path(out_path).exists():
             return False
 
@@ -331,7 +327,9 @@ class ParseDocumentService:
 
     async def download_part_content(self, task_id: str, part_index: int) -> Path | None:
         """Returns the path to a part's markdown file if it exists."""
-        content_path = Path(PARSES_DIR / f"{task_id}_part_{part_index:03d}.md")
+        content_path = Path(
+            core_settings.parses_dir / f"{task_id}_part_{part_index:03d}.md"
+        )
         if await content_path.exists():
             return content_path
         return None
@@ -342,7 +340,9 @@ class ParseDocumentService:
         if not task_data:
             return None
 
-        merged_path = Path(PARSES_DIR / f"{task_id}_merged.md")
+        format_val = task_data.get("output_format", "markdown")
+        ext = "md" if format_val == "markdown" else format_val
+        merged_path = Path(core_settings.parses_dir / f"{task_id}_merged.{ext}")
         if await merged_path.exists():
             return merged_path
 
@@ -353,7 +353,9 @@ class ParseDocumentService:
         # Merge all completed parts into a single file
         async with await open_file(merged_path, "w", encoding="utf-8") as out:
             for i in range(total_parts):
-                part_path = Path(PARSES_DIR / f"{task_id}_part_{i:03d}.md")
+                part_path = Path(
+                    core_settings.parses_dir / f"{task_id}_part_{i:03d}.{ext}"
+                )
                 if await part_path.exists():
                     async with await open_file(part_path, "r", encoding="utf-8") as f:
                         await out.write(await f.read())
