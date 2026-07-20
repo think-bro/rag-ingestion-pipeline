@@ -6,6 +6,7 @@ class IndexSettings(BaseSettings):
     default_url: str = "http://host.docker.internal:6333"
     default_embedding_dim: int = 1024
     default_distance_metric: str = "Cosine"
+    default_sparse_modifier: str = "IDF"
     upload_batch_size: int = 100
     max_preview_items: int = 50
 

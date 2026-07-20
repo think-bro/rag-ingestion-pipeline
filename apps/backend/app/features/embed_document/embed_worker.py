@@ -5,7 +5,7 @@ import signal
 import traceback
 import pyarrow as pa
 import pyarrow.parquet as pq
-from fastembed import TextEmbedding
+from fastembed import TextEmbedding, SparseTextEmbedding
 
 from apps.backend.app.core.config import settings as core_settings
 from .config import settings as embed_settings
@@ -48,9 +48,23 @@ def main():
             write_error(args.error_json_path, "No chunks found in input file")
             sys.exit(1)
 
-        model_name = config.get("model_name", embed_settings.default_model_name)
+        dense_model_name = config.get(
+            "dense_model", embed_settings.default_dense_model_name
+        )
         embedding_model = TextEmbedding(
-            model_name=model_name, cache_dir=core_settings.hf_models_cache_dir
+            model_name=dense_model_name, cache_dir=core_settings.hf_models_cache_dir
+        )
+
+        sparse_model_name = config.get(
+            "sparse_model", embed_settings.default_sparse_model_name
+        )
+        sparse_language = config.get(
+            "sparse_language", embed_settings.default_sparse_language
+        )
+        sparse_model = SparseTextEmbedding(
+            model_name=sparse_model_name,
+            cache_dir=core_settings.hf_models_cache_dir,
+            language=sparse_language,
         )
 
         # Prepare texts
@@ -61,6 +75,7 @@ def main():
         with open(args.progress_json_path, "w", encoding="utf-8") as f:
             json.dump(progress_data, f)
 
+        # Dense embeddings
         embeddings_list = []
         for i, vector in enumerate(
             embedding_model.embed(texts, batch_size=embed_settings.embed_batch_size),
@@ -72,6 +87,20 @@ def main():
                 progress_data["completed"] = i
                 with open(args.progress_json_path, "w", encoding="utf-8") as f:
                     json.dump(progress_data, f)
+
+        # Sparse embeddings
+        sparse_indices_list = []
+        sparse_values_list = []
+        for sparse_vector in sparse_model.embed(
+            texts, batch_size=embed_settings.embed_batch_size
+        ):
+            sparse_indices_list.append(sparse_vector.indices.tolist())
+            sparse_values_list.append(sparse_vector.values.tolist())
+            # TODO: Sparse embeddings currently execute extremely fast
+            # compared to Dense embeddings. Therefore, progress is only tracked during
+            # the Dense loop above to provide a smooth UX. If a heavier, neural-based sparse model
+            # is introduced in the future, its duration will be significant, and this progress
+            # tracking logic must be refactored to account for both loops proportionally.
 
         # Build pyarrow table
         chunk_ids = [c.get("chunk_id", "") for c in chunks]
@@ -87,7 +116,13 @@ def main():
                 "text": original_texts,
                 "contextualized_text": contextualized_texts,
                 "metadata": metadatas,
-                "embedding": pa.array(embeddings_list, type=pa.list_(pa.float32())),
+                "dense_vector": pa.array(embeddings_list, type=pa.list_(pa.float32())),
+                "sparse_indices": pa.array(
+                    sparse_indices_list, type=pa.list_(pa.int32())
+                ),
+                "sparse_values": pa.array(
+                    sparse_values_list, type=pa.list_(pa.float32())
+                ),
             }
         )
 
@@ -104,7 +139,9 @@ def main():
             )
 
         preview_data = {
-            "model_name": model_name,
+            "dense_model_name": dense_model_name,
+            "sparse_model_name": sparse_model_name,
+            "sparse_language": sparse_language,
             "embedding_dim": len(embeddings_list[0]) if embeddings_list else 0,
             "total_vectors": len(chunks),
             "items": preview_items,

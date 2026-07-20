@@ -27,6 +27,8 @@ class IndexConfig(BaseModel):
     url: str = Field(default=index_settings.default_url)
     collection_name: str
     embedding_dim: int = Field(default=index_settings.default_embedding_dim)
+    distance_metric: str = Field(default=index_settings.default_distance_metric)
+    sparse_modifier: str = Field(default=index_settings.default_sparse_modifier)
 
 
 class IndexItem(BaseModel):

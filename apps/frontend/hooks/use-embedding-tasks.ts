@@ -23,10 +23,10 @@ export function useEmbedTaskResult(taskId: string | null) {
   });
 }
 
-export function useEmbedModels() {
+export function useEmbedOptions() {
   return useQuery({
-    queryKey: ["embed-models"],
-    queryFn: () => api.getEmbedModels(),
+    queryKey: ["embed-options"],
+    queryFn: () => api.getEmbedOptions(),
     staleTime: 1000 * 60 * 60, // 1 hour
   });
 }

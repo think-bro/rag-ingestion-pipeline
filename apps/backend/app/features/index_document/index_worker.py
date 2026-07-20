@@ -73,6 +73,18 @@ def main():
             )
             sys.exit(1)
 
+        sparse_modifier_str = config.get(
+            "sparse_modifier", index_settings.default_sparse_modifier
+        )
+        try:
+            sparse_modifier = getattr(models.Modifier, sparse_modifier_str.upper())
+        except AttributeError:
+            write_error(
+                args.error_json_path,
+                f"Invalid sparse modifier: {sparse_modifier_str}",
+            )
+            sys.exit(1)
+
         # Connect to Qdrant
         try:
             client = QdrantClient(url=url)
@@ -80,13 +92,25 @@ def main():
             write_error(args.error_json_path, f"Failed to connect to Qdrant: {str(e)}")
             sys.exit(1)
 
-        # Check and create collection
+        # Check and create collection (hybrid: dense + sparse named vectors)
         if not client.collection_exists(collection_name):
+            # TODO: The collection is currently hardcoded as a Hybrid collection (dense + sparse).
+            # This provides maximum flexibility at query time (allowing purely semantic, purely keyword,
+            # or fused hybrid search). However, if storage optimization becomes a priority in the future,
+            # consider adding an `index_mode` (e.g., "dense", "sparse", "hybrid") to `IndexConfig`
+            # and creating the collection schema dynamically based on that mode.
             client.create_collection(
                 collection_name=collection_name,
-                vectors_config=models.VectorParams(
-                    size=embedding_dim, distance=distance_metric
-                ),
+                vectors_config={
+                    "dense": models.VectorParams(
+                        size=embedding_dim, distance=distance_metric
+                    ),
+                },
+                sparse_vectors_config={
+                    "sparse": models.SparseVectorParams(
+                        modifier=sparse_modifier,
+                    ),
+                },
             )
 
         completed_vectors = 0
@@ -99,7 +123,9 @@ def main():
 
             points = []
             for row in batch_data:
+                chunk_id = str(row.get("chunk_id", ""))
                 payload = {
+                    "chunk_id": chunk_id,
                     "text": row.get("text", ""),
                     "contextualized_text": row.get("contextualized_text", ""),
                 }
@@ -112,10 +138,21 @@ def main():
                     except Exception:
                         pass
 
-                chunk_id = str(row.get("chunk_id", ""))
+                dense_vector = row.get("dense_vector", [])
+                sparse_indices = row.get("sparse_indices", []) or []
+                sparse_values = row.get("sparse_values", []) or []
+
                 points.append(
                     models.PointStruct(
-                        id=chunk_id, vector=row.get("embedding", []), payload=payload
+                        id=chunk_id,
+                        vector={
+                            "dense": dense_vector,
+                            "sparse": models.SparseVector(
+                                indices=sparse_indices,
+                                values=sparse_values,
+                            ),
+                        },
+                        payload=payload,
                     )
                 )
 

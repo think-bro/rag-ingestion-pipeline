@@ -8,7 +8,7 @@ This project processes raw documents (like PDFs, etc.) and prepares them for vec
 **Pipeline Stages:**
 1. **Parsing:** Extracts structured content from raw documents using Docling. Outputs structured Markdown.
 2. **Chunking:** Splits the parsed document into hierarchical and token-aware recursive chunks using LangChain and Chonkie.
-3. **Embedding:** Generating vector embeddings for chunks using FastEmbed, saving output as Parquet.
+3. **Embedding:** Generating hybrid (dense and sparse) vector embeddings for chunks using FastEmbed, saving output as Parquet.
 4. **Indexing:** Indexing the embeddings directly into a Vector Database.
 
 ## Tech Stack
