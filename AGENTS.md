@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. It also supports recursive chunking via Chonkie and LangChain, vector embedding via FastEmbed, and indexing to push embeddings into vector databases.
+Asynchronous document ingestion pipeline for RAG workflows. Accepts files (PDF, etc.), parses them via Docling, and converts to structured Markdown. It also supports recursive chunking via Chonkie and LangChain, hybrid (dense and sparse) vector embedding via FastEmbed, and indexing to push embeddings into vector databases.
 
 ## Tech Stack
 
