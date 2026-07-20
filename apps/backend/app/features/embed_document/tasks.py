@@ -145,13 +145,17 @@ async def embed_task(
                 result_data = json.load(f)
                 total_vectors = result_data.get("total_vectors", 0)
                 embedding_dim = result_data.get("embedding_dim", 0)
-                model_name = result_data.get("model_name", "unknown")
+                dense_model_name = result_data.get("dense_model_name", "unknown")
+                sparse_model_name = result_data.get("sparse_model_name", "unknown")
+                sparse_language = result_data.get("sparse_language", "unknown")
                 await redis.hset(
                     f"embed_task:{task_id}",
                     mapping={
                         "total_vectors": total_vectors,
                         "embedding_dim": embedding_dim,
-                        "model_name": model_name,
+                        "dense_model_name": dense_model_name,
+                        "sparse_model_name": sparse_model_name,
+                        "sparse_language": sparse_language,
                     },
                 )
         await redis.hset(f"embed_task:{task_id}", "status", TaskStatus.COMPLETED.value)

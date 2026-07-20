@@ -18,13 +18,44 @@ class TaskStatus(enum.StrEnum):
     CANCELLED = "cancelled"
 
 
-class SupportedEmbedModels(enum.StrEnum):
-    MULTILINGUAL_E5_LARGE = embed_settings.default_model_name
+class SupportedDenseModels(enum.StrEnum):
+    MULTILINGUAL_E5_LARGE = embed_settings.default_dense_model_name
+
+
+class SupportedSparseModels(enum.StrEnum):
+    QDRANT_BM25 = embed_settings.default_sparse_model_name
+
+
+class SupportedSparseLanguages(enum.StrEnum):
+    ARABIC = "arabic"
+    DANISH = "danish"
+    DUTCH = "dutch"
+    ENGLISH = "english"
+    FINNISH = "finnish"
+    FRENCH = "french"
+    GERMAN = "german"
+    GREEK = "greek"
+    HUNGARIAN = "hungarian"
+    ITALIAN = "italian"
+    NORWEGIAN = "norwegian"
+    PORTUGUESE = "portuguese"
+    ROMANIAN = "romanian"
+    RUSSIAN = "russian"
+    SPANISH = "spanish"
+    SWEDISH = "swedish"
+    TAMIL = "tamil"
+    TURKISH = "turkish"
 
 
 class EmbedConfig(BaseModel):
-    model_name: SupportedEmbedModels = Field(
-        default=SupportedEmbedModels.MULTILINGUAL_E5_LARGE
+    dense_model: SupportedDenseModels = Field(
+        default=SupportedDenseModels.MULTILINGUAL_E5_LARGE
+    )
+    sparse_model: SupportedSparseModels = Field(
+        default=SupportedSparseModels.QDRANT_BM25
+    )
+    sparse_language: SupportedSparseLanguages = Field(
+        default=SupportedSparseLanguages.TURKISH
     )
 
 

@@ -127,10 +127,14 @@ class EmbedDocumentController(Controller):
         )
 
 
-class EmbedModelsController(Controller):
-    path = "/embed-models"
+class EmbedOptionsController(Controller):
+    path = "/embed-options"
 
     @get()
-    async def list_embed_models(self) -> list[dict[str, str]]:
-        """Retrieves a list of all supported embedding models."""
-        return embed_settings.supported_models
+    async def get_embed_options(self) -> dict[str, list[dict[str, str]]]:
+        """Retrieves all configuration options for the embedding process."""
+        return {
+            "dense_models": embed_settings.supported_dense_models,
+            "sparse_models": embed_settings.supported_sparse_models,
+            "sparse_languages": embed_settings.supported_sparse_languages,
+        }

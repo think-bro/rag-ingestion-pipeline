@@ -24,7 +24,7 @@ from apps.backend.app.features.chunk_document.controller import (
 from apps.backend.app.features.chunk_document.service import ChunkDocumentService
 from apps.backend.app.features.embed_document.controller import (
     EmbedDocumentController,
-    EmbedModelsController,
+    EmbedOptionsController,
 )
 from apps.backend.app.features.embed_document.service import EmbedDocumentService
 from apps.backend.app.features.index_document.controller import (
@@ -116,7 +116,7 @@ def create_app() -> Litestar:
             ChunkDocumentController,
             ChunkPresetController,
             EmbedDocumentController,
-            EmbedModelsController,
+            EmbedOptionsController,
             IndexDocumentController,
             VectorDBsController,
         ],
