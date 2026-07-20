@@ -5,7 +5,9 @@ function isValidSubmission(
   taskType: string,
   successfulItems: UploadItem[],
   preset: string,
-  embedModel?: string,
+  denseModel?: string,
+  sparseModel?: string,
+  sparseLanguage?: string,
   vectorDb?: string
 ) {
   if (successfulItems.length === 0 || taskType === "unselected") {
@@ -14,7 +16,12 @@ function isValidSubmission(
   if (taskType === "chunk" && preset === "unselected") {
     return false;
   }
-  if (taskType === "embed" && embedModel === "unselected") {
+  if (
+    taskType === "embed" &&
+    (denseModel === "unselected" ||
+      sparseModel === "unselected" ||
+      sparseLanguage === "unselected")
+  ) {
     return false;
   }
   if (taskType === "index" && vectorDb === "unselected") {
@@ -29,7 +36,9 @@ function buildTaskPayload(
   format: string,
   preset: string,
   customMetadata: Record<string, string>,
-  embedModel?: string,
+  denseModel?: string,
+  sparseModel?: string,
+  sparseLanguage?: string,
   vectorDb?: string,
   vectorDbUrl?: string,
   vectorDbCollection?: string,
@@ -57,7 +66,9 @@ function buildTaskPayload(
   if (taskType === "embed") {
     return {
       ...basePayload,
-      embedModel,
+      denseModel,
+      sparseModel,
+      sparseLanguage,
     };
   }
 
@@ -89,7 +100,9 @@ export function useIngestionSubmit({
   items,
   taskType,
   preset,
-  embedModel,
+  denseModel,
+  sparseModel,
+  sparseLanguage,
   vectorDb,
   vectorDbUrl,
   vectorDbCollection,
@@ -105,7 +118,9 @@ export function useIngestionSubmit({
   items: UploadItem[];
   taskType: "unselected" | "parse" | "chunk" | "embed" | "index";
   preset: string;
-  embedModel?: string;
+  denseModel?: string;
+  sparseModel?: string;
+  sparseLanguage?: string;
   vectorDb?: string;
   vectorDbUrl?: string;
   vectorDbCollection?: string;
@@ -117,7 +132,9 @@ export function useIngestionSubmit({
     filename: string;
     action?: "parse" | "chunk" | "embed" | "index";
     formatOrPreset?: string;
-    embedModel?: string;
+    denseModel?: string;
+    sparseModel?: string;
+    sparseLanguage?: string;
     customMetadata?: Record<string, string>;
     presetData?: Preset;
     indexConfig?: IndexConfig;
@@ -143,7 +160,9 @@ export function useIngestionSubmit({
         taskType,
         successfulItems,
         preset,
-        embedModel,
+        denseModel,
+        sparseModel,
+        sparseLanguage,
         vectorDb
       )
     ) {
@@ -158,7 +177,9 @@ export function useIngestionSubmit({
           format,
           preset,
           customMetadata,
-          embedModel,
+          denseModel,
+          sparseModel,
+          sparseLanguage,
           vectorDb,
           vectorDbUrl,
           vectorDbCollection,

@@ -107,13 +107,15 @@ export interface EmbedItem {
 export interface EmbedTaskResponse {
   completed_vectors?: number;
   created_at?: string;
+  dense_model_name?: string;
   embedding_dim?: number;
   error?: string;
   file_size?: number;
   filename?: string;
   items?: EmbedItem[];
-  model_name?: string;
   processing_time?: number;
+  sparse_language?: string;
+  sparse_model_name?: string;
   status: TaskStatus;
   task_id: string;
   task_type: "embedding";
@@ -227,7 +229,9 @@ export const api = {
     formatOrPreset?: string,
     customMetadata?: Record<string, string>,
     presetData?: Preset,
-    embedModel?: string,
+    denseModel?: string,
+    sparseModel?: string,
+    sparseLanguage?: string,
     indexConfig?: IndexConfig
   ): Promise<{ task_id: string; status: string; message: string }> {
     let endpoint = `${BASE_URL}/parse-tasks`;
@@ -259,7 +263,11 @@ export const api = {
       body = {
         file_id: fileId,
         filename,
-        config: embedModel ? { model_name: embedModel } : undefined,
+        config: {
+          dense_model: denseModel,
+          sparse_model: sparseModel,
+          sparse_language: sparseLanguage,
+        },
       };
     } else if (action === "index") {
       body = {
@@ -463,10 +471,14 @@ export const api = {
     return res.blob();
   },
 
-  async getEmbedModels(): Promise<{ id: string; name: string }[]> {
-    const res = await fetch(`${BASE_URL}/embed-models`);
+  async getEmbedOptions(): Promise<{
+    dense_models: { id: string; name: string }[];
+    sparse_models: { id: string; name: string }[];
+    sparse_languages: { id: string; name: string }[];
+  }> {
+    const res = await fetch(`${BASE_URL}/embed-options`);
     if (!res.ok) {
-      throw new Error(`Failed to fetch embed models: ${res.statusText}`);
+      throw new Error(`Failed to fetch embed options: ${res.statusText}`);
     }
     return res.json();
   },

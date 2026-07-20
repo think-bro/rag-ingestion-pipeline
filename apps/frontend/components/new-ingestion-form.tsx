@@ -4,6 +4,7 @@ import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type FileRejection, useDropzone } from "react-dropzone";
 import { CustomMetadataSelects } from "@/components/custom-metadata-selects";
+import { EmbedOptionSelects } from "@/components/embed-option-selects";
 import { FileListItem } from "@/components/file-list-item";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VectorDbInputs } from "@/components/vector-db-inputs";
-import { useEmbedModels } from "@/hooks/use-embedding-tasks";
 import { useIndexDBs } from "@/hooks/use-indexing-tasks";
 import { useIngestionSubmit } from "@/hooks/use-ingestion-submit";
 import { usePresets, useSubmitTask } from "@/hooks/use-tasks";
@@ -86,7 +86,9 @@ function getAcceptedFiles(
 function getMissingSelectionMessage(
   taskType: string,
   preset: string,
-  embedModel: string,
+  denseModel: string,
+  sparseModel: string,
+  sparseLanguage: string,
   vectorDb: string
 ): string | null {
   if (taskType === "unselected") {
@@ -95,8 +97,16 @@ function getMissingSelectionMessage(
   if (taskType === "chunk" && preset === "unselected") {
     return "Please select a Chunking Preset first";
   }
-  if (taskType === "embed" && embedModel === "unselected") {
-    return "Please select an Embedding Model first";
+  if (taskType === "embed") {
+    if (denseModel === "unselected") {
+      return "Please select a Dense Model first";
+    }
+    if (sparseModel === "unselected") {
+      return "Please select a Sparse Model first";
+    }
+    if (sparseLanguage === "unselected") {
+      return "Please select a Sparse Language first";
+    }
   }
   if (taskType === "index" && vectorDb === "unselected") {
     return "Please select a Vector Database first";
@@ -120,7 +130,9 @@ function getDropzoneSubtitle(taskType: string): string {
 function isDropzoneDisabled(
   taskType: string,
   preset: string,
-  embedModel: string,
+  denseModel: string,
+  sparseModel: string,
+  sparseLanguage: string,
   vectorDb: string,
   itemCount: number,
   isFormPending: boolean
@@ -137,7 +149,12 @@ function isDropzoneDisabled(
   if (taskType === "chunk" && preset === "unselected") {
     return true;
   }
-  if (taskType === "embed" && embedModel === "unselected") {
+  if (
+    taskType === "embed" &&
+    (denseModel === "unselected" ||
+      sparseModel === "unselected" ||
+      sparseLanguage === "unselected")
+  ) {
     return true;
   }
   if (taskType === "index" && vectorDb === "unselected") {
@@ -149,7 +166,9 @@ function isDropzoneDisabled(
 function isDropzoneVisualDisabled(
   taskType: string,
   preset: string,
-  embedModel: string,
+  denseModel: string,
+  sparseModel: string,
+  sparseLanguage: string,
   vectorDb: string
 ): boolean {
   if (taskType === "unselected") {
@@ -158,7 +177,12 @@ function isDropzoneVisualDisabled(
   if (taskType === "chunk" && preset === "unselected") {
     return true;
   }
-  if (taskType === "embed" && embedModel === "unselected") {
+  if (
+    taskType === "embed" &&
+    (denseModel === "unselected" ||
+      sparseModel === "unselected" ||
+      sparseLanguage === "unselected")
+  ) {
     return true;
   }
   if (taskType === "index" && vectorDb === "unselected") {
@@ -191,8 +215,12 @@ export function NewIngestionForm({
   const setTaskType = useFormStore((s) => s.setTaskType);
   const preset = useFormStore((s) => s.preset);
   const setPreset = useFormStore((s) => s.setPreset);
-  const embedModel = useFormStore((s) => s.embedModel);
-  const setEmbedModel = useFormStore((s) => s.setEmbedModel);
+  const denseModel = useFormStore((s) => s.denseModel);
+  const setDenseModel = useFormStore((s) => s.setDenseModel);
+  const sparseModel = useFormStore((s) => s.sparseModel);
+  const setSparseModel = useFormStore((s) => s.setSparseModel);
+  const sparseLanguage = useFormStore((s) => s.sparseLanguage);
+  const setSparseLanguage = useFormStore((s) => s.setSparseLanguage);
   const vectorDb = useFormStore((s) => s.vectorDb);
   const setVectorDb = useFormStore((s) => s.setVectorDb);
   const format = useFormStore((s) => s.format);
@@ -206,8 +234,6 @@ export function NewIngestionForm({
 
   const isUploading = items.some((i) => i.status === "uploading");
   const isFormPending = isPending || isUploading;
-  const { data: embedModels, isLoading: isLoadingEmbedModels } =
-    useEmbedModels();
   const { data: indexDBs, isLoading: isLoadingIndexDBs } = useIndexDBs();
 
   useEffect(() => {
@@ -228,7 +254,9 @@ export function NewIngestionForm({
       disabled: isDropzoneDisabled(
         taskType,
         preset,
-        embedModel,
+        denseModel,
+        sparseModel,
+        sparseLanguage,
         vectorDb,
         items.length,
         isFormPending
@@ -251,7 +279,9 @@ export function NewIngestionForm({
     items,
     taskType,
     preset,
-    embedModel,
+    denseModel,
+    sparseModel,
+    sparseLanguage,
     vectorDb,
     vectorDbUrl,
     vectorDbCollection,
@@ -332,36 +362,16 @@ export function NewIngestionForm({
           </div>
         )}
 
-        {taskType === "embed" && (
-          <div className="col-span-full sm:col-span-3">
-            <Select
-              disabled={isFormPending}
-              onValueChange={(v: string) => setEmbedModel(v)}
-              value={embedModel}
-            >
-              <SelectTrigger className="w-full" id="embed-model">
-                <SelectValue placeholder="Select embedding model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Models</SelectLabel>
-                  <SelectItem value="unselected">Select a Model</SelectItem>
-                  {isLoadingEmbedModels ? (
-                    <SelectItem disabled value="loading">
-                      Loading...
-                    </SelectItem>
-                  ) : (
-                    (embedModels || []).map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <EmbedOptionSelects
+          denseModel={denseModel}
+          isFormPending={isFormPending}
+          setDenseModel={setDenseModel}
+          setSparseLanguage={setSparseLanguage}
+          setSparseModel={setSparseModel}
+          sparseLanguage={sparseLanguage}
+          sparseModel={sparseModel}
+          taskType={taskType}
+        />
 
         {taskType === "index" && (
           <div className="col-span-full sm:col-span-3">
@@ -428,7 +438,14 @@ export function NewIngestionForm({
               isDragActive
                 ? "border-primary bg-primary/10 ring-2 ring-primary/20"
                 : "border-border",
-              isDropzoneVisualDisabled(taskType, preset, embedModel, vectorDb)
+              isDropzoneVisualDisabled(
+                taskType,
+                preset,
+                denseModel,
+                sparseModel,
+                sparseLanguage,
+                vectorDb
+              )
                 ? "cursor-not-allowed bg-muted/50 opacity-60"
                 : "",
               "mt-2 flex justify-center rounded-md border border-dashed px-6 py-20 transition-colors duration-200"
@@ -443,14 +460,18 @@ export function NewIngestionForm({
                 {getMissingSelectionMessage(
                   taskType,
                   preset,
-                  embedModel,
+                  denseModel,
+                  sparseModel,
+                  sparseLanguage,
                   vectorDb
                 ) ? (
                   <p className="font-medium text-foreground text-sm">
                     {getMissingSelectionMessage(
                       taskType,
                       preset,
-                      embedModel,
+                      denseModel,
+                      sparseModel,
+                      sparseLanguage,
                       vectorDb
                     )}
                   </p>
@@ -469,7 +490,9 @@ export function NewIngestionForm({
                 {getMissingSelectionMessage(
                   taskType,
                   preset,
-                  embedModel,
+                  denseModel,
+                  sparseModel,
+                  sparseLanguage,
                   vectorDb
                 ) ?? getDropzoneSubtitle(taskType)}
               </p>

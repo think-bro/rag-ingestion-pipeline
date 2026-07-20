@@ -85,7 +85,9 @@ export function useSubmitTask() {
       formatOrPreset,
       customMetadata,
       presetData,
-      embedModel,
+      denseModel,
+      sparseModel,
+      sparseLanguage,
       indexConfig,
     }: {
       fileId: string;
@@ -94,7 +96,9 @@ export function useSubmitTask() {
       formatOrPreset?: string;
       customMetadata?: Record<string, string>;
       presetData?: Preset;
-      embedModel?: string;
+      denseModel?: string;
+      sparseModel?: string;
+      sparseLanguage?: string;
       indexConfig?: {
         db_name: string;
         url: string;
@@ -109,7 +113,9 @@ export function useSubmitTask() {
         formatOrPreset,
         customMetadata,
         presetData,
-        embedModel,
+        denseModel,
+        sparseModel,
+        sparseLanguage,
         indexConfig
       ),
     onSuccess: () => {
