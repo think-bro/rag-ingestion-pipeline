@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.7.0...backend-v0.8.0) (2026-07-20)
+
+
+### Features
+
+* **backend:** add hybrid embedding generation and qdrant indexing support ([bc6c8c8](https://github.com/think-bro/rag-ingestion-pipeline/commit/bc6c8c8a0efcc847c512676ec5de8e3a3a83fae9))
+* Implement hybrid embedding pipeline ([80d03ac](https://github.com/think-bro/rag-ingestion-pipeline/commit/80d03ac5e55cee9da231612350d2bb2c9da475f3))
+
 ## [0.7.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.6.0...backend-v0.7.0) (2026-07-19)
 
 

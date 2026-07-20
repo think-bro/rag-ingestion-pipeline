@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.7.0...frontend-v0.8.0) (2026-07-20)
+
+
+### Features
+
+* **frontend:** add dense and sparse model selection to ingestion ui ([9344a18](https://github.com/think-bro/rag-ingestion-pipeline/commit/9344a1815cd740f8d276ba915249efd9750f35e4))
+* Implement hybrid embedding pipeline ([80d03ac](https://github.com/think-bro/rag-ingestion-pipeline/commit/80d03ac5e55cee9da231612350d2bb2c9da475f3))
+
 ## [0.7.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.6.0...frontend-v0.7.0) (2026-07-19)
 
 
