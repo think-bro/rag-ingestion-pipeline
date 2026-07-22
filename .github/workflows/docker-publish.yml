@@ -84,14 +84,6 @@ jobs:
           sbom: true
           provenance: mode=max
 
-      - name: Run Docker Scout
-        uses: docker/scout-action@v1
-        with:
-          command: cves,sbom
-          image: odest/${{ matrix.service }}:${{ needs.resolve.outputs.version }}
-          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Update Docker Hub Description
         uses: peter-evans/dockerhub-description@v5
         with:
