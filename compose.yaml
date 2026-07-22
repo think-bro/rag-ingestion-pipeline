@@ -15,7 +15,7 @@ services:
       retries: 5
 
   backend:
-    image: odest/rag-backend:0.8.0
+    image: odest/rag-backend:0.8.1
     ports:
       - "8000:8000"
     environment:
@@ -45,7 +45,7 @@ services:
       retries: 3
 
   worker:
-    image: odest/rag-backend:0.8.0
+    image: odest/rag-backend:0.8.1
     environment:
       - DOCLING_DEVICE=cpu
       - HF_HOME=/workspace/models/hf
@@ -70,7 +70,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: odest/rag-frontend:0.8.0
+    image: odest/rag-frontend:0.8.1
     ports:
       - "3000:8080"
     restart: unless-stopped
