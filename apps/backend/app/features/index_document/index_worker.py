@@ -94,24 +94,29 @@ def main():
 
         # Check and create collection (hybrid: dense + sparse named vectors)
         if not client.collection_exists(collection_name):
-            # TODO: The collection is currently hardcoded as a Hybrid collection (dense + sparse).
-            # This provides maximum flexibility at query time (allowing purely semantic, purely keyword,
-            # or fused hybrid search). However, if storage optimization becomes a priority in the future,
-            # consider adding an `index_mode` (e.g., "dense", "sparse", "hybrid") to `IndexConfig`
-            # and creating the collection schema dynamically based on that mode.
-            client.create_collection(
-                collection_name=collection_name,
-                vectors_config={
-                    "dense": models.VectorParams(
-                        size=embedding_dim, distance=distance_metric
-                    ),
-                },
-                sparse_vectors_config={
-                    "sparse": models.SparseVectorParams(
-                        modifier=sparse_modifier,
-                    ),
-                },
-            )
+            try:
+                # TODO: The collection is currently hardcoded as a Hybrid collection (dense + sparse).
+                # This provides maximum flexibility at query time (allowing purely semantic, purely keyword,
+                # or fused hybrid search). However, if storage optimization becomes a priority in the future,
+                # consider adding an `index_mode` (e.g., "dense", "sparse", "hybrid") to `IndexConfig`
+                # and creating the collection schema dynamically based on that mode.
+                client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config={
+                        "dense": models.VectorParams(
+                            size=embedding_dim, distance=distance_metric
+                        ),
+                    },
+                    sparse_vectors_config={
+                        "sparse": models.SparseVectorParams(
+                            modifier=sparse_modifier,
+                        ),
+                    },
+                )
+            except Exception as e:
+                # Handle race condition: if another worker created the collection concurrently (409 Conflict), ignore it
+                if "already exists" not in str(e).lower() and "409" not in str(e):
+                    raise
 
         completed_vectors = 0
         preview_items = []
