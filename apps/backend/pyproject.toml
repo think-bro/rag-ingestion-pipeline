@@ -18,4 +18,5 @@ dependencies = [
     "fastembed>=0.8.0",
     "pyarrow>=25.0.0",
     "qdrant-client>=1.18.0",
+    "pillow>=12.3.0",
 ]
