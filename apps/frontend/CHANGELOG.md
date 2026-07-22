@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.8.0...frontend-v0.8.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **frontend:** update shadcn to patch vulnerable transitive dependencies ([ecc9ff4](https://github.com/think-bro/rag-ingestion-pipeline/commit/ecc9ff4c460cfe46b03860b92d78c74ec732cf3e))
+
 ## [0.8.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/frontend-v0.7.0...frontend-v0.8.0) (2026-07-20)
 
 

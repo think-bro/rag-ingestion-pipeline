@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.8.0...backend-v0.8.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **backend:** bump pillow to 12.3.0 to resolve security vulnerabilities ([db1b548](https://github.com/think-bro/rag-ingestion-pipeline/commit/db1b548a41a042daa56cb86d868c6a21e6821192))
+* **backend:** handle race condition during collection creation ([496e260](https://github.com/think-bro/rag-ingestion-pipeline/commit/496e260b3dc0cbb9f06e9c91015ceac93c39c39c))
+
 ## [0.8.0](https://github.com/think-bro/rag-ingestion-pipeline/compare/backend-v0.7.0...backend-v0.8.0) (2026-07-20)
 
 
